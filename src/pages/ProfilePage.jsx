@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { apiRequest } from '../api'
 import ArticleCard from '../components/ArticleCard'
+import Editor from '../components/Editor'
 import LoadingDots from '../components/LoadingDots'
 import { navigateTo } from '../hooks/useHashRoute'
 import { getDisplayName, getHeadline, getInitials, withProtocol } from '../utils/articleUtils'
@@ -64,6 +65,9 @@ export default function ProfilePage({
   const [publicationRequests, setPublicationRequests] = useState([])
   const [publicationRequestsLoading, setPublicationRequestsLoading] = useState(false)
   const [publicationRequestsError, setPublicationRequestsError] = useState('')
+  const [viewingRequestId, setViewingRequestId] = useState(null)
+  const [editingRequestDraft, setEditingRequestDraft] = useState(null)
+  const [savingRequest, setSavingRequest] = useState(false)
   const [publications, setPublications] = useState([])
   const [publicationsLoading, setPublicationsLoading] = useState(false)
   const [publicationsError, setPublicationsError] = useState('')
@@ -431,6 +435,44 @@ export default function ProfilePage({
       await Promise.all([loadPublicationRequests(), loadDrafts(), loadRequestedArticles()])
     } catch (error) {
       setFeedback(error.message)
+    }
+  }
+
+  function handleViewRequest(request) {
+    setViewingRequestId(request.id)
+    setEditingRequestDraft(request.draft)
+  }
+
+  function handleCloseRequest() {
+    setViewingRequestId(null)
+    setEditingRequestDraft(null)
+  }
+
+  async function handleSaveRequestDraft() {
+    if (!editingRequestDraft) return
+
+    setSavingRequest(true)
+    try {
+      await apiRequest(`/drafts/${editingRequestDraft.id}`, {
+        method: 'PUT',
+        body: {
+          title: editingRequestDraft.title,
+          summary: editingRequestDraft.summary,
+          body: editingRequestDraft.body,
+          domain: editingRequestDraft.domain,
+          tags: editingRequestDraft.tags,
+          coverImage: editingRequestDraft.coverImage,
+          coverLabel: editingRequestDraft.coverLabel,
+        },
+      })
+      setFeedback('Draft updated successfully.')
+      setViewingRequestId(null)
+      setEditingRequestDraft(null)
+      await loadPublicationRequests()
+    } catch (error) {
+      setFeedback(error.message)
+    } finally {
+      setSavingRequest(false)
     }
   }
 
@@ -940,7 +982,130 @@ export default function ProfilePage({
             </div>
           </div>
 
-          {publicationRequestsLoading ? (
+          {viewingRequestId ? (
+            <div className="request-editor-container">
+              <button
+                className="button button--ghost"
+                type="button"
+                onClick={handleCloseRequest}
+                style={{ marginBottom: '1.5rem' }}
+              >
+                ← Back to requests
+              </button>
+
+              {editingRequestDraft && (
+                <>
+                  <div className="editor-form">
+                    <div className="form-group">
+                      <label htmlFor="editor-title">Title</label>
+                      <input
+                        id="editor-title"
+                        type="text"
+                        value={editingRequestDraft.title || ''}
+                        onChange={(e) =>
+                          setEditingRequestDraft({
+                            ...editingRequestDraft,
+                            title: e.target.value,
+                          })
+                        }
+                        className="form-input"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="editor-summary">Summary</label>
+                      <textarea
+                        id="editor-summary"
+                        value={editingRequestDraft.summary || ''}
+                        onChange={(e) =>
+                          setEditingRequestDraft({
+                            ...editingRequestDraft,
+                            summary: e.target.value,
+                          })
+                        }
+                        className="form-input"
+                        rows="3"
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="editor-domain">Domain</label>
+                      <select
+                        id="editor-domain"
+                        value={editingRequestDraft.domain || 'General'}
+                        onChange={(e) =>
+                          setEditingRequestDraft({
+                            ...editingRequestDraft,
+                            domain: e.target.value,
+                          })
+                        }
+                        className="form-input"
+                      >
+                        <option>General</option>
+                        <option>Politics</option>
+                        <option>Technology</option>
+                        <option>Sports</option>
+                        <option>Business</option>
+                        <option>Entertainment</option>
+                        <option>Science</option>
+                        <option>Health</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label>Article Body</label>
+                      <Editor
+                        value={editingRequestDraft.body || ''}
+                        onChange={(html) =>
+                          setEditingRequestDraft({
+                            ...editingRequestDraft,
+                            body: html,
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="form-actions" style={{ marginTop: '2rem' }}>
+                      <button
+                        className="button button--secondary"
+                        type="button"
+                        onClick={handleSaveRequestDraft}
+                        disabled={savingRequest}
+                      >
+                        {savingRequest ? 'Saving...' : 'Save Changes'}
+                      </button>
+
+                      <button
+                        className="button button--primary"
+                        type="button"
+                        onClick={() => {
+                          const notes = prompt('Admin notes (optional):')
+                          handleApprovePublication(viewingRequestId, notes)
+                          handleCloseRequest()
+                        }}
+                      >
+                        Approve & Publish
+                      </button>
+
+                      <button
+                        className="button button--danger"
+                        type="button"
+                        onClick={() => {
+                          const notes = prompt('Rejection reason:')
+                          if (notes !== null) {
+                            handleRejectPublication(viewingRequestId, notes)
+                            handleCloseRequest()
+                          }
+                        }}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : publicationRequestsLoading ? (
             <LoadingDots />
           ) : publicationRequestsError ? (
             <div className="panel empty-panel">
@@ -963,6 +1128,13 @@ export default function ProfilePage({
                     <span>Author: {request.author.email}</span>
                   </div>
                   <div className="request-actions">
+                    <button
+                      className="button button--secondary"
+                      type="button"
+                      onClick={() => handleViewRequest(request)}
+                    >
+                      View & Edit
+                    </button>
                     <button
                       className="button button--primary"
                       type="button"

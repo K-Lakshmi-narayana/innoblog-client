@@ -1670,6 +1670,50 @@
   position: relative;
 }
 
+.request-editor-container {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.editor-form {
+  background: var(--surface);
+  border: 1px solid var(--border-color, rgba(0,0,0,0.1));
+  border-radius: var(--radius-lg, 12px);
+  padding: 2rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color, rgba(0,0,0,0.15));
+  border-radius: var(--radius-md, 8px);
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
 .request-header {
   display: flex;
   justify-content: space-between;
