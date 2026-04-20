@@ -1,4 +1,4 @@
-const API_BASE = 'https://innoblog-server.onrender.com/api'
+const API_BASE = import.meta.env.VITE_API_URL || 'https://innoblog-server.onrender.com/api'
 
 export async function apiRequest(path, options = {}) {
   const { method = 'GET', body, headers = {}, token } = options
