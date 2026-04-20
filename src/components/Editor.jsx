@@ -170,7 +170,9 @@ function ResizableImageComponent({ node, updateAttributes, selected, deleteNode 
           clear: 'none',
         }}
       >
-        <img src={node.attrs.src} alt={node.attrs.alt || ''} />
+        {node.attrs.src && (
+          <img src={node.attrs.src} alt={node.attrs.alt || 'Image'} />
+        )}
         <button
           type="button"
           className="resize-handle resize-handle--left"
