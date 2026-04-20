@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:4000/api'
+const API_BASE = 'https://innoblog-server.onrender.com/api'
 
 export async function apiRequest(path, options = {}) {
   const { method = 'GET', body, headers = {}, token } = options
