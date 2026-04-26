@@ -662,26 +662,28 @@ export default function ProfilePage({
                 <span className="eyebrow">Access list</span>
                 {authorsError ? <p>{authorsError}</p> : null}
                 <div className="writer-list">
-                  {authors.map((author) => (
-                    <div key={author.id} className="writer-list__item">
-                      <div>
-                        <strong>{author.profile?.displayName || author.email}</strong>
-                        <span>{author.email}</span>
+                  {authors
+                    .filter((author) => author.canWrite)
+                    .map((author) => (
+                      <div key={author.id} className="writer-list__item">
+                        <div>
+                          <strong>{author.profile?.displayName || author.email}</strong>
+                          <span>{author.email}</span>
+                        </div>
+                        <div className="writer-list__role">
+                          <span>{author.role}</span>
+                          {author.role !== 'admin' && author.canWrite ? (
+                            <button
+                              type="button"
+                              className="button button--ghost button--small"
+                              onClick={() => handleRevokeAccess(author.id)}
+                            >
+                              Revoke access
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
-                      <div className="writer-list__role">
-                        <span>{author.role}</span>
-                        {author.role !== 'admin' && author.canWrite ? (
-                          <button
-                            type="button"
-                            className="button button--ghost button--small"
-                            onClick={() => handleRevokeAccess(author.id)}
-                          >
-                            Revoke access
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               </div>
 
@@ -733,7 +735,7 @@ export default function ProfilePage({
             Drafts ({drafts.length})
           </button>
         )}
-        {viewingSelf && canWrite && (
+        {viewingSelf && canWrite && session?.user?.role !== 'admin' && (
           <button
             className={`profile-tab ${activeTab === 'requests' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('requests')}

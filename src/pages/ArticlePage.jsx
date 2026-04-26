@@ -3,6 +3,7 @@ import MonacoEditor from '@monaco-editor/react'
 
 import { apiRequest } from '../api'
 import ArticleCard from '../components/ArticleCard'
+import ShareButton from '../components/ShareButton'
 import LoadingDots from '../components/LoadingDots'
 import { navigateTo } from '../hooks/useHashRoute'
 import {
@@ -532,12 +533,6 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
           </div>
 
           <div className="story-actions">
-            {articleIsPubliclyVisible ? (
-              <button className="button button--primary" type="button" onClick={handleLike}>
-                {article.likedByMe ? 'Unlike article' : 'Like article'}
-              </button>
-            ) : null}
-
             {canManageArticle ? (
               <a className="button button--secondary" href={`#/article/${article.slug}/edit`}>
                 Edit article
@@ -547,18 +542,6 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
             {canManageArticle ? (
               <button className="button button--ghost" type="button" onClick={handleDeleteArticle}>
                 Delete article
-              </button>
-            ) : null}
-
-            {authorHandle ? (
-              <a className="button button--secondary" href={`#/profile/${authorHandle}`}>
-                View author profile
-              </a>
-            ) : null}
-
-            {canFollow ? (
-              <button className="button button--ghost" type="button" onClick={handleFollowAuthor}>
-                {article.author.profile.isFollowing ? 'Unfollow author' : 'Follow author'}
               </button>
             ) : null}
           </div>
@@ -582,7 +565,17 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       </section>
 
       <section className="story-layout">
-        <aside className="story-sidebar story-sidebar--left">
+        <div className="panel story-content">
+          <div className="story-body">
+            {parsedBody !== null ? (
+              parsedBody
+            ) : (
+              <div dangerouslySetInnerHTML={{ __html: article.bodyHtml }} />
+            )}
+          </div>
+        </div>
+
+        <aside className="story-sidebar story-sidebar--right">
           <div className="panel sidebar-card toc-panel">
             <span className="eyebrow">Table of contents</span>
             {article.toc.filter((entry) => entry.level === 2).length ? (
@@ -603,35 +596,56 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
             )}
           </div>
         </aside>
+      </section>
 
-        <div className="panel story-content">
-          <div className="story-body">
-            {parsedBody !== null ? (
-              parsedBody
-            ) : (
-              <div dangerouslySetInnerHTML={{ __html: article.bodyHtml }} />
-            )}
-          </div>
-        </div>
-
-        <aside className="story-sidebar">
-          <div className="panel sidebar-card">
+      {/* Article interactions section below the content */}
+      <section className="article-interactions">
+        <div className="interactions-grid">
+          {/* Author card */}
+          <div className="panel interaction-card author-card-full">
             <span className="eyebrow">Author</span>
-            <div className="author-card">
+            <div className="author-profile">
               <span className="author-card__avatar">{getInitials(authorName)}</span>
-              <div>
+              <div className="author-info">
                 <strong>{authorName}</strong>
                 <span>{authorHeadline}</span>
+                <p>{article.author.profile?.bio || 'This author has not added a bio yet.'}</p>
+                <p className="author-meta">
+                  {article.author.profile?.followersCount || 0} followers · Published on{' '}
+                  {formatShortDate(article.publishedAt)}
+                </p>
+                {authorHandle ? (
+                  <a className="button button--secondary button--small" href={`#/profile/${authorHandle}`}>
+                    View author profile
+                  </a>
+                ) : null}
               </div>
             </div>
-            <p>{article.author.profile?.bio || 'This author has not added a bio yet.'}</p>
-            <p>
-              {article.author.profile?.followersCount || 0} followers · Published on{' '}
-              {formatShortDate(article.publishedAt)}
-            </p>
           </div>
 
-          <div className="panel sidebar-card">
+          {/* Engagement section */}
+          <div className="panel interaction-card engagement-card">
+            <span className="eyebrow">Engagement</span>
+            <div className="engagement-actions">
+              {articleIsPubliclyVisible ? (
+                <button className="button button--primary" type="button" onClick={handleLike}>
+                  {article.likedByMe ? '❤️ Unlike article' : '🤍 Like article'}
+                </button>
+              ) : null}
+
+              <ShareButton title={article.title} url={`#/article/${article.slug}`} />
+
+              {articleIsPubliclyVisible ? (
+                <div className="engagement-stats">
+                  <span>{article.likeCount} likes</span>
+                  <span>{article.commentCount} comments</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div className="panel interaction-card tags-card">
             <span className="eyebrow">Tags</span>
             <div className="article-card__tags">
               {article.tags.length ? (
@@ -645,58 +659,58 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
               )}
             </div>
           </div>
-
-          <div className="panel sidebar-card">
-            <span className="eyebrow">Community</span>
-            {articleIsPubliclyVisible ? (
-              <>
-                <form className="comment-form" onSubmit={handleCommentSubmit}>
-                  <label className="field">
-                    <span>Add a comment</span>
-                    <input
-                      type="text"
-                      placeholder="Share your reaction or question..."
-                      value={commentBody}
-                      onChange={(event) => setCommentBody(event.target.value)}
-                    />
-                  </label>
-                  {commentError ? <p className="form-message form-message--error">{commentError}</p> : null}
-                  <button className="button button--primary" type="submit">
-                    Post comment
-                  </button>
-                </form>
-
-                <div className="comment-list">
-                  {comments.length ? (
-                    comments.map((comment) => (
-                      <article key={comment.id} className="comment-card">
-                        <div className="comment-card__top">
-                          <strong>{getDisplayName(comment.author)}</strong>
-                          <span>{formatShortDate(comment.createdAt)}</span>
-                        </div>
-                        <p>{comment.body}</p>
-                        {(session?.user?.role === 'admin' || comment.author?.id === session?.user?.id || article.author?.id === session?.user?.id) ? (
-                          <button
-                            type="button"
-                            className="button button--ghost button--small comment-delete"
-                            onClick={() => handleCommentDelete(comment.id)}
-                          >
-                            Delete comment
-                          </button>
-                        ) : null}
-                      </article>
-                    ))
-                  ) : (
-                    <p>Be the first reader to comment on this story.</p>
-                  )}
-                </div>
-              </>
-            ) : (
-              <p>Comments stay disabled until the article is published.</p>
-            )}
-          </div>
-        </aside>
+        </div>
       </section>
+
+      {/* Comments section */}
+      {articleIsPubliclyVisible ? (
+        <section className="article-comments-section">
+          <div className="panel">
+            <span className="eyebrow">Community discussion</span>
+
+            <form className="comment-form" onSubmit={handleCommentSubmit}>
+              <label className="field">
+                <span>Add a comment</span>
+                <input
+                  type="text"
+                  placeholder="Share your reaction or question..."
+                  value={commentBody}
+                  onChange={(event) => setCommentBody(event.target.value)}
+                />
+              </label>
+              {commentError ? <p className="form-message form-message--error">{commentError}</p> : null}
+              <button className="button button--primary" type="submit">
+                Post comment
+              </button>
+            </form>
+
+            <div className="comment-list">
+              {comments.length ? (
+                comments.map((comment) => (
+                  <article key={comment.id} className="comment-card">
+                    <div className="comment-card__top">
+                      <strong>{getDisplayName(comment.author)}</strong>
+                      <span>{formatShortDate(comment.createdAt)}</span>
+                    </div>
+                    <p>{comment.body}</p>
+                    {(session?.user?.role === 'admin' || comment.author?.id === session?.user?.id || article.author?.id === session?.user?.id) ? (
+                      <button
+                        type="button"
+                        className="button button--ghost button--small comment-delete"
+                        onClick={() => handleCommentDelete(comment.id)}
+                      >
+                        Delete comment
+                      </button>
+                    ) : null}
+                  </article>
+                ))
+              ) : (
+                <p>Be the first reader to comment on this story.</p>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section>
         <div className="section-heading">

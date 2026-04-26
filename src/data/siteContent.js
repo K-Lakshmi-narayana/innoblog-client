@@ -35,6 +35,12 @@ export const domains = [
     name: 'MLOps',
     description: 'Pipelines, deployment, observability, and operational excellence.',
   },
+  {
+    slug: 'stats',
+    label: 'Stats',
+    name: 'Statistics',
+    description: 'Statistical methods, analysis, inference, and data interpretation.',
+  },
 ]
 
 export const domainLookup = Object.fromEntries(

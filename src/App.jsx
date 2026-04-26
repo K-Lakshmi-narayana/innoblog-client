@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 
 import { apiRequest } from './api'
 import AppHeader from './components/AppHeader'
+import Sidebar from './components/Sidebar'
 import ErrorBoundary from './components/ErrorBoundary'
 import LoadingDots from './components/LoadingDots'
 import SiteFooter from './components/SiteFooter'
@@ -453,7 +454,17 @@ function App() {
   return (
     <div className="app-shell">
       <div className="page-backdrop" aria-hidden="true" />
-      <AppHeader currentPath={currentPath} session={session} onLogout={handleLogout} />
+      <AppHeader 
+        currentPath={currentPath} 
+        session={session} 
+        onLogout={handleLogout}
+      />
+      <Sidebar 
+        currentPath={currentPath} 
+        session={session}
+        isOpen={true}
+        onClose={() => {}}
+      />
       <main className="app-main">
         <ErrorBoundary>{renderPage()}</ErrorBoundary>
       </main>

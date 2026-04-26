@@ -611,11 +611,8 @@ export default function Editor({ value, onChange }) {
 
   function handleImageUpload(event) {
     const file = event.target.files?.[0]
-
-    if (!file) {
-      return
-    }
-
+    if (!file) return
+    
     const reader = new FileReader()
     reader.onload = () => {
       editor.chain().focus().setImage({ src: reader.result }).run()
