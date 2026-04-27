@@ -26,7 +26,7 @@ export default function AppHeader({ currentPath, session, onLogout }) {
         <div className="app-header__bar">
           <div className='mobile-logo'>
           <a className="brand" href="#/">
-            <img width={48} height={42} src={logo} alt="logo" />
+            <img width={30} height={27} src={logo} alt="logo" />
             <span className="brand__wordmark">
               <strong>I N N O B L O G</strong>
               <span>Your Daily Dose of Tech x AI </span>

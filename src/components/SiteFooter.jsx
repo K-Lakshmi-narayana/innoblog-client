@@ -8,7 +8,7 @@ export default function SiteFooter({ domains }) {
       <div className="site-footer__grid">
         <div>
           <a className="brand brand--footer" href="#/">
-            <img width={70} height={75} src={logo} alt="logo" />
+            <img width={44} height={48} src={logo} alt="logo" />
             <span className="brand__wordmark">
               <strong>I N N O B L O G</strong>
               <span>Your Daily Dose of Tech x AI</span>
