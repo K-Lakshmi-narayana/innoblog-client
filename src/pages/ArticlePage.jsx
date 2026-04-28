@@ -433,9 +433,18 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
   }
 
   function scrollToHeading(id) {
-    document.getElementById(id)?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
+    const element = document.getElementById(id)
+    if (!element) return
+
+    const storyBody = document.querySelector('.story-body')
+    if (!storyBody) return
+
+    const elementTop = element.offsetTop
+    const offset = 420 // Offset to prevent scrolling under navbar
+    
+    storyBody.scrollTo({
+      top: Math.max(0, elementTop - offset),
+      behavior: 'smooth'
     })
   }
 
