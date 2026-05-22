@@ -53,6 +53,7 @@ function App() {
   const [session, setSession] = useState(readStoredSession)
   const [articles, setArticles] = useState([])
   const [topArticles, setTopArticles] = useState([])
+  const [domainStats, setDomainStats] = useState({})
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [catalogError, setCatalogError] = useState('')
 
@@ -119,9 +120,10 @@ function App() {
       setCatalogError('')
 
       try {
-        const [articleResponse, topResponse] = await Promise.all([
+        const [articleResponse, topResponse, statsResponse] = await Promise.all([
           apiRequest('/articles'),
           apiRequest('/articles/top'),
+          apiRequest('/domains/stats'),
         ])
 
         if (ignore) {
@@ -130,6 +132,13 @@ function App() {
 
         setArticles(articleResponse.articles)
         setTopArticles(topResponse.articles)
+        
+        // Create a map of domain -> count
+        const statsMap = {}
+        statsResponse.stats.forEach((stat) => {
+          statsMap[stat.domain] = stat.count
+        })
+        setDomainStats(statsMap)
       } catch (error) {
         if (!ignore) {
           setArticles([])
@@ -152,26 +161,31 @@ function App() {
 
   const domainSummaries = domains.map((domain) => ({
     ...domain,
-    count: articles.filter((article) => article.domain === domain.slug).length,
+    count: domainStats[domain.slug] || 0,
   }))
 
   const [rawPath, rawQuery] = currentPath.split('?')
   const normalizedPath = rawPath || '/'
   const pathSegments = normalizedPath.split('/').filter(Boolean)
   const currentDomain = pathSegments[0] === 'domain' ? domainLookup[pathSegments[1]] : null
-  const domainArticles = currentDomain
-    ? articles.filter((article) => article.domain === currentDomain.slug)
-    : []
   const searchParams = new URLSearchParams(rawQuery || '')
 
   async function refreshCatalog() {
-    const [articleResponse, topResponse] = await Promise.all([
+    const [articleResponse, topResponse, statsResponse] = await Promise.all([
       apiRequest('/articles'),
       apiRequest('/articles/top'),
+      apiRequest('/domains/stats'),
     ])
 
     setArticles(articleResponse.articles)
     setTopArticles(topResponse.articles)
+    
+    // Create a map of domain -> count
+    const statsMap = {}
+    statsResponse.stats.forEach((stat) => {
+      statsMap[stat.domain] = stat.count
+    })
+    setDomainStats(statsMap)
   }
 
   async function handleLogout() {
@@ -188,14 +202,22 @@ function App() {
   }
 
   function handleAuthenticated(nextSession) {
+    console.log('[handleAuthenticated] Received session:', nextSession)
+    console.log('[handleAuthenticated] User email:', nextSession?.user?.email)
+    console.log('[handleAuthenticated] User canWrite:', nextSession?.user?.canWrite)
+    
     setSession({ user: nextSession.user })
-    navigateTo(nextSession.user.canWrite ? '/create' : '/articles')
+    
+    const redirectPath = nextSession.user.canWrite ? '/create' : '/articles'
+    console.log('[handleAuthenticated] Redirecting to:', redirectPath)
+    navigateTo(redirectPath)
   }
 
   async function handleRequestOtp(payload) {
     return apiRequest('/auth/request-otp', {
       method: 'POST',
       body: payload,
+      timeout: 60000, // 60 seconds for Render cold start
     })
   }
 
@@ -206,6 +228,33 @@ function App() {
     })
 
     handleAuthenticated(authSession)
+  }
+
+  async function handleGoogleLogin(credential) {
+    console.log('[GoogleLogin Handler] Starting Google login with credential length:', credential?.length)
+    
+    try {
+      console.log('[GoogleLogin Handler] Making API request to /auth/google-login')
+      const authSession = await apiRequest('/auth/google-login', {
+        method: 'POST',
+        body: { credential },
+      })
+      
+      console.log('[GoogleLogin Handler] Full response:', authSession)
+      console.log('[GoogleLogin Handler] User object:', authSession.user)
+      console.log('[GoogleLogin Handler] Token:', authSession.token?.substring(0, 20) + '...')
+      
+      if (!authSession.user) {
+        throw new Error('No user in response')
+      }
+      
+      console.log('[GoogleLogin Handler] Calling handleAuthenticated with user:', authSession.user.email)
+      handleAuthenticated(authSession)
+      console.log('[GoogleLogin Handler] Authentication handled successfully')
+    } catch (error) {
+      console.error('[GoogleLogin Handler] Error:', error.message, error)
+      throw error
+    }
   }
 
   async function handlePublish(draft, { articleId = '', draftId = '' } = {}) {
@@ -303,9 +352,25 @@ function App() {
     )
   }
 
+  function renderWithBoundary(content, options = {}) {
+    return (
+      <ErrorBoundary
+        resetKey={currentPath}
+        title={options.title}
+        description={options.description}
+        actionHref={options.actionHref}
+        actionLabel={options.actionLabel}
+        contextLabel={options.contextLabel}
+      >
+        {content}
+      </ErrorBoundary>
+    )
+  }
+
   function renderPage() {
     if (currentPath === '/') {
-      return (
+      return renderWithBoundary(
+        (
         <LandingPage
           articles={articles}
           domains={domainSummaries}
@@ -314,6 +379,14 @@ function App() {
           loading={catalogLoading}
           error={catalogError}
         />
+        ),
+        {
+          title: 'Home feed failed to render.',
+          description: 'The article catalog loaded into an unexpected state. Refresh and try again.',
+          actionHref: '#/articles',
+          actionLabel: 'Open articles',
+          contextLabel: 'landing page',
+        },
       )
     }
 
@@ -322,13 +395,15 @@ function App() {
         <LoginPage
           onRequestOtp={handleRequestOtp}
           onVerifyOtp={handleVerifyOtp}
+          onGoogleLogin={handleGoogleLogin}
           session={session}
         />
       )
     }
 
     if (normalizedPath === '/create') {
-      return (
+      return renderWithBoundary(
+        (
         <Suspense
           fallback={
             <section className="panel gated-panel loading-screen">
@@ -346,30 +421,60 @@ function App() {
         >
           <CreateArticlePage onPublish={handlePublish} session={session} />
         </Suspense>
+        ),
+        {
+          title: 'The editor ran into a problem.',
+          description: 'Your draft can be reopened from the dashboard after a refresh.',
+          actionHref: '#/profile/me?tab=drafts',
+          actionLabel: 'Open dashboard',
+          contextLabel: 'article editor',
+        },
       )
     }
 
     if (currentPath === '/articles') {
-      return (
+      return renderWithBoundary(
+        (
         <ExplorePage
           articles={articles}
           domains={domainSummaries}
           loading={catalogLoading}
           error={catalogError}
         />
+        ),
+        {
+          title: 'The article feed failed to render.',
+          description: 'Refresh the feed or open a different section while we recover.',
+          actionHref: '#/',
+          actionLabel: 'Return home',
+          contextLabel: 'article feed',
+        },
       )
     }
 
     if (currentPath === '/top') {
-      return <TopArticlesPage articles={topArticles} />
+      return renderWithBoundary(<TopArticlesPage articles={topArticles} />, {
+        title: 'Top stories are unavailable right now.',
+        description: 'Try the main feed while this section recovers.',
+        actionHref: '#/articles',
+        actionLabel: 'Open articles',
+        contextLabel: 'top articles page',
+      })
     }
 
     if (pathSegments[0] === 'domain' && currentDomain) {
-      return <DomainPage articles={domainArticles} domain={currentDomain} />
+      return renderWithBoundary(<DomainPage domain={currentDomain} />, {
+        title: 'This domain page failed to render.',
+        description: 'Try reloading or head back to the broader article feed.',
+        actionHref: '#/articles',
+        actionLabel: 'Open articles',
+        contextLabel: 'domain page',
+      })
     }
 
     if (pathSegments[0] === 'draft' && pathSegments[1] && pathSegments[2] === 'edit') {
-      return (
+      return renderWithBoundary(
+        (
         <Suspense
           fallback={
             <section className="panel gated-panel loading-screen">
@@ -388,11 +493,20 @@ function App() {
             onPublish={handlePublish}
           />
         </Suspense>
+        ),
+        {
+          title: 'This draft editor failed to load.',
+          description: 'The draft is still stored on the server. Refresh or reopen it from your dashboard.',
+          actionHref: '#/profile/me?tab=drafts',
+          actionLabel: 'Open drafts',
+          contextLabel: 'draft editor',
+        },
       )
     }
 
     if (pathSegments[0] === 'article' && pathSegments[1] && pathSegments[2] === 'edit') {
-      return (
+      return renderWithBoundary(
+        (
         <Suspense
           fallback={
             <section className="panel gated-panel loading-screen">
@@ -411,21 +525,39 @@ function App() {
             onPublish={handlePublish}
           />
         </Suspense>
+        ),
+        {
+          title: 'This article editor failed to load.',
+          description: 'Refresh the page or reopen the article from your publications list.',
+          actionHref: '#/profile/me?tab=publications',
+          actionLabel: 'Open publications',
+          contextLabel: 'article editor',
+        },
       )
     }
 
     if (pathSegments[0] === 'article' && pathSegments[1]) {
-      return (
+      return renderWithBoundary(
+        (
         <ArticlePage
           slug={pathSegments[1]}
           session={session}
           onDeleteArticle={handleDeleteArticle}
         />
+        ),
+        {
+          title: 'This article view failed to render.',
+          description: 'The story data may still be available. Refresh or open the main feed.',
+          actionHref: '#/articles',
+          actionLabel: 'Browse articles',
+          contextLabel: 'article page',
+        },
       )
     }
 
     if (pathSegments[0] === 'profile' && pathSegments[1]) {
-      return (
+      return renderWithBoundary(
+        (
         <ProfilePage
           handle={pathSegments[1]}
           initialTab={searchParams.get('tab') || ''}
@@ -433,6 +565,14 @@ function App() {
           onSessionUserUpdate={handleSessionUserUpdate}
           onCatalogRefresh={refreshCatalog}
         />
+        ),
+        {
+          title: 'The dashboard failed to render.',
+          description: 'Refresh the page or reopen the profile to recover drafts, requests, and publications.',
+          actionHref: '#/profile/me',
+          actionLabel: 'Open profile',
+          contextLabel: 'profile dashboard',
+        },
       )
     }
 
@@ -466,7 +606,16 @@ function App() {
         onClose={() => {}}
       />
       <main className="app-main">
-        <ErrorBoundary>{renderPage()}</ErrorBoundary>
+        <ErrorBoundary
+          resetKey={currentPath}
+          title="The app hit an unexpected state."
+          description="Refresh the page or head back home to continue reading."
+          actionHref="#/"
+          actionLabel="Return home"
+          contextLabel="app shell"
+        >
+          {renderPage()}
+        </ErrorBoundary>
       </main>
       <SiteFooter domains={domains} />
       {navigationLoading ? (

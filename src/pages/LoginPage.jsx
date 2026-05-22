@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { GoogleLogin } from '@react-oauth/google'
 
 import LoadingDots from '../components/LoadingDots'
 import { loginBenefits } from '../data/siteContent'
+import { getUserFriendlyError } from '../utils/errorMessages'
 
-export default function LoginPage({ onRequestOtp, onVerifyOtp, session }) {
+export default function LoginPage({ onRequestOtp, onVerifyOtp, onGoogleLogin, session }) {
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -39,7 +41,7 @@ export default function LoginPage({ onRequestOtp, onVerifyOtp, session }) {
       setStep('verify')
       setFeedback(result.message || 'OTP sent. Check your inbox.')
     } catch (error) {
-      setFeedback(error.message)
+      setFeedback(getUserFriendlyError(error))
     } finally {
       setLoading(false)
     }
@@ -61,10 +63,48 @@ export default function LoginPage({ onRequestOtp, onVerifyOtp, session }) {
         code: form.code,
       })
     } catch (error) {
-      setFeedback(error.message)
+      setFeedback(getUserFriendlyError(error))
     } finally {
       setLoading(false)
     }
+  }
+
+  async function handleGoogleSuccess(credentialResponse) {
+    console.log('[GoogleSuccess] Called with response:', !!credentialResponse)
+    console.log('[GoogleSuccess] Has credential:', !!credentialResponse?.credential)
+    
+    setLoading(true)
+    setFeedback('')
+    
+    try {
+      if (!credentialResponse || !credentialResponse.credential) {
+        throw new Error('No credential in response')
+      }
+      
+      console.log('[GoogleSuccess] Credential length:', credentialResponse.credential.length)
+      console.log('[GoogleSuccess] Calling onGoogleLogin...')
+      
+      const result = await onGoogleLogin(credentialResponse.credential)
+      
+      console.log('[GoogleSuccess] onGoogleLogin returned:', !!result)
+      console.log('[GoogleSuccess] Login completed successfully!')
+      
+    } catch (error) {
+      console.error('[GoogleSuccess] Error:', {
+        message: error.message,
+        status: error.status,
+        code: error.code,
+        details: error.details,
+      })
+      setFeedback(getUserFriendlyError(error))
+      setLoading(false)
+    }
+  }
+
+  function handleGoogleError() {
+    console.error('[GoogleError] Google sign-in encountered an error')
+    setFeedback('Google login failed. Please try again.')
+    setLoading(false)
   }
 
   if (session) {
@@ -118,6 +158,23 @@ export default function LoginPage({ onRequestOtp, onVerifyOtp, session }) {
       >
         <span className="eyebrow">Welcome back</span>
         <h2>Sign in to InnoBlog</h2>
+
+        {step === 'request' && (
+          <>
+            <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'center' }}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                text="signin_with"
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+              <div style={{ flex: 1, height: '1px', backgroundColor: '#ccc' }} />
+              <span style={{ fontSize: '14px', color: '#666' }}>or</span>
+              <div style={{ flex: 1, height: '1px', backgroundColor: '#ccc' }} />
+            </div>
+          </>
+        )}
 
         <label className="field">
           <span>Name</span>

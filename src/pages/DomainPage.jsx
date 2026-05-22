@@ -1,9 +1,92 @@
+import { useEffect, useState } from 'react'
+import { apiRequest } from '../api'
 import ArticleCard from '../components/ArticleCard'
 import SectionHeading from '../components/SectionHeading'
+import LoadingDots from '../components/LoadingDots'
+import { getUserFriendlyError } from '../utils/errorMessages'
 
-export default function DomainPage({ articles, domain }) {
+export default function DomainPage({ domain }) {
+  const [articles, setArticles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [page, setPage] = useState(1)
+  const [limit] = useState(10)
+  const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+
+  useEffect(() => {
+    let ignore = false
+
+    async function loadDomainArticles() {
+      setLoading(true)
+      setError('')
+
+      try {
+        const data = await apiRequest(`/articles?domain=${domain.slug}&page=${page}&limit=${limit}`)
+
+        if (ignore) {
+          return
+        }
+
+        setArticles(data.articles)
+        setTotalCount(data.totalCount || 0)
+        setTotalPages(data.totalPages || 1)
+      } catch (fetchError) {
+        if (!ignore) {
+          setError(getUserFriendlyError(fetchError))
+          setArticles([])
+          setTotalCount(0)
+          setTotalPages(1)
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadDomainArticles()
+
+    return () => {
+      ignore = true
+    }
+  }, [domain.slug, page, limit])
+
+  function handlePreviousPage() {
+    setPage((current) => Math.max(1, current - 1))
+  }
+
+  function handleNextPage() {
+    setPage((current) => Math.min(totalPages, current + 1))
+  }
+
+  const pageNumbers = Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+    const start = Math.max(1, page - 2)
+    return start + i
+  }).filter((p) => p <= totalPages)
+
   const leadStory = articles[0]
   const remainingStories = articles.slice(1)
+
+  if (loading) {
+    return (
+      <section className="panel empty-panel loading-screen">
+        <div>
+          <strong>Loading {domain.name} articles...</strong>
+          <LoadingDots />
+        </div>
+      </section>
+    )
+  }
+
+  if (error) {
+    return (
+      <section className="panel empty-panel">
+        <strong>Error loading articles</strong>
+        <p>{error}</p>
+      </section>
+    )
+  }
 
   return (
     <div className="page-stack">
@@ -14,7 +97,7 @@ export default function DomainPage({ articles, domain }) {
           <p>{domain.description}</p>
         </div>
         <div className="page-banner__metric">
-          <strong>{String(articles.length).padStart(2, '0')}</strong>
+          <strong>{String(totalCount).padStart(2, '0')}</strong>
           <span>stories in this domain</span>
         </div>
       </section>
@@ -48,6 +131,46 @@ export default function DomainPage({ articles, domain }) {
           ))}
         </div>
       </section>
+
+      {totalCount > 10 && (
+        <>
+          <div className="pagination-summary">
+            Showing {Math.min((page - 1) * limit + 1, totalCount)}-{Math.min(page * limit, totalCount)} of {totalCount} articles
+          </div>
+
+          <div className="pagination-controls">
+            <button
+              className="button button--ghost"
+              type="button"
+              onClick={handlePreviousPage}
+              disabled={page <= 1 || loading}
+            >
+              Previous
+            </button>
+
+            {pageNumbers.map((pageNumber) => (
+              <button
+                key={pageNumber}
+                className={`button button--ghost${pageNumber === page ? ' is-active' : ''}`}
+                type="button"
+                onClick={() => setPage(pageNumber)}
+                disabled={loading}
+              >
+                {pageNumber}
+              </button>
+            ))}
+
+            <button
+              className="button button--ghost"
+              type="button"
+              onClick={handleNextPage}
+              disabled={page >= totalPages || loading}
+            >
+              Next
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

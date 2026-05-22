@@ -1,32 +1,31 @@
-import { useState, useEffect } from 'react'
-import { MdOutlineLightMode, MdOutlineDarkMode } from "react-icons/md";
+import { useEffect, useState } from 'react'
+import { MdOutlineDarkMode, MdOutlineLightMode } from 'react-icons/md'
 
+function getInitialThemeState() {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  const savedTheme = window.localStorage.getItem('innoblog-theme')
+
+  if (savedTheme) {
+    return savedTheme === 'dark'
+  }
+
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+}
 
 export default function ThemeToggle() {
-  const [isDark, setIsDark] = useState(false)
+  const [isDark, setIsDark] = useState(getInitialThemeState)
 
   useEffect(() => {
-    // Check for saved preference or system preference
-    const savedTheme = localStorage.getItem('innoblog-theme')
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-
-    if (savedTheme) {
-      setIsDark(savedTheme === 'dark')
-      document.documentElement.setAttribute('data-theme', savedTheme)
-    } else if (prefersDark) {
-      setIsDark(true)
-      document.documentElement.setAttribute('data-theme', 'dark')
-    } else {
-      setIsDark(false)
-      document.documentElement.setAttribute('data-theme', 'light')
-    }
-  }, [])
+    const theme = isDark ? 'dark' : 'light'
+    window.localStorage.setItem('innoblog-theme', theme)
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [isDark])
 
   function toggleTheme() {
-    const newTheme = isDark ? 'light' : 'dark'
-    setIsDark(!isDark)
-    localStorage.setItem('innoblog-theme', newTheme)
-    document.documentElement.setAttribute('data-theme', newTheme)
+    setIsDark((current) => !current)
   }
 
   return (
@@ -38,9 +37,13 @@ export default function ThemeToggle() {
       title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
     >
       {isDark ? (
-        <span className="theme-icon"><MdOutlineLightMode /></span>
+        <span className="theme-icon">
+          <MdOutlineLightMode />
+        </span>
       ) : (
-        <span className="theme-icon"><MdOutlineDarkMode /></span>
+        <span className="theme-icon">
+          <MdOutlineDarkMode />
+        </span>
       )}
     </button>
   )

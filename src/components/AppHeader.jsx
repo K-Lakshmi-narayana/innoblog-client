@@ -76,8 +76,7 @@ export default function AppHeader({ currentPath, session, onLogout }) {
                     {getInitials(getDisplayName(session.user))}
                   </span>
                   <div>
-                    <strong>{getDisplayName(session.user)}</strong>
-                    <span>{' ' + session.user.role}</span>
+                    <span>{session.user.role}</span>
                   </div>
                 </a>
 

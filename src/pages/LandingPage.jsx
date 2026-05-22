@@ -4,6 +4,7 @@ import { apiRequest } from '../api'
 import ArticleCard from '../components/ArticleCard'
 import LoadingDots from '../components/LoadingDots'
 import SectionHeading from '../components/SectionHeading'
+import { getUserFriendlyError } from '../utils/errorMessages'
 import { getDisplayName } from '../utils/articleUtils'
 
 export default function LandingPage({
@@ -62,7 +63,7 @@ export default function LandingPage({
         creditEmail: '',
       })
     } catch (error) {
-      setPublishError(error.message)
+      setPublishError(getUserFriendlyError(error))
     } finally {
       setPublishLoading(false)
     }

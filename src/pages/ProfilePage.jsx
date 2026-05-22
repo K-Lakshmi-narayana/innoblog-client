@@ -4,10 +4,11 @@ import { apiRequest } from '../api'
 import ArticleCard from '../components/ArticleCard'
 import LoadingDots from '../components/LoadingDots'
 import { navigateTo } from '../hooks/useHashRoute'
+import { getUserFriendlyError } from '../utils/errorMessages'
 import { getDisplayName, getHeadline, getInitials, withProtocol } from '../utils/articleUtils'
 
 function getAllowedTabs(viewingSelf, role) {
-  const canWrite = ['admin', 'author'].includes(role)
+  const canWrite = ['admin', 'author', 'writer'].includes(role)
   const tabs = [viewingSelf && canWrite ? 'publications' : 'articles']
 
   if (viewingSelf && canWrite) {
@@ -74,7 +75,7 @@ export default function ProfilePage({
   const viewingSelf =
     handle === 'me' || Boolean(session?.user?.profile?.handle && session.user.profile.handle === handle)
   const requiresLogin = viewingSelf && !session?.user
-  const canWrite = ['admin', 'author'].includes(session?.user?.role)
+  const canWrite = ['admin', 'author', 'writer'].includes(session?.user?.role)
 
   const loadAdminMetrics = useCallback(async () => {
     if (!viewingSelf || session?.user?.role !== 'admin') return
@@ -297,7 +298,7 @@ export default function ProfilePage({
         profile: data.profile,
       })
     } catch (error) {
-      setFeedback(error.message)
+      setFeedback(getUserFriendlyError(error))
     }
   }
 
@@ -317,7 +318,7 @@ export default function ProfilePage({
         profile: data.profile,
       }))
     } catch (error) {
-      setFeedback(error.message)
+      setFeedback(getUserFriendlyError(error))
     }
   }
 
@@ -339,7 +340,7 @@ export default function ProfilePage({
       const users = await apiRequest('/admin/authors')
       setAuthors(users.users)
     } catch (error) {
-      setFeedback(error.message)
+      setFeedback(getUserFriendlyError(error))
     }
   }
 
@@ -353,7 +354,7 @@ export default function ProfilePage({
       const users = await apiRequest('/admin/authors')
       setAuthors(users.users)
     } catch (error) {
-      setFeedback(error.message)
+      setFeedback(getUserFriendlyError(error))
     }
   }
 
@@ -370,7 +371,7 @@ export default function ProfilePage({
       await Promise.all([loadDrafts(), loadRequestedArticles(), loadPublications()])
       setActiveTab('requests')
     } catch (error) {
-      setFeedback(error.message)
+      setFeedback(getUserFriendlyError(error))
     }
   }
 
@@ -386,7 +387,7 @@ export default function ProfilePage({
       setFeedback('Draft removed successfully.')
       await Promise.all([loadDrafts(), loadRequestedArticles(), loadPublications()])
     } catch (error) {
-      setFeedback(error.message)
+      setFeedback(getUserFriendlyError(error))
     }
   }
 
@@ -403,7 +404,7 @@ export default function ProfilePage({
       await Promise.all([loadRequestedArticles(), loadDrafts(), loadPublications()])
       setActiveTab('drafts')
     } catch (error) {
-      setFeedback(error.message)
+      setFeedback(getUserFriendlyError(error))
     }
   }
 
@@ -417,7 +418,7 @@ export default function ProfilePage({
       await Promise.all([loadPublicationRequests(), loadAdminMetrics(), loadPublications()])
       await onCatalogRefresh?.()
     } catch (error) {
-      setFeedback(error.message)
+      setFeedback(getUserFriendlyError(error))
     }
   }
 
@@ -430,7 +431,7 @@ export default function ProfilePage({
       setFeedback('Article rejected. Author can resubmit as draft.')
       await Promise.all([loadPublicationRequests(), loadDrafts(), loadRequestedArticles()])
     } catch (error) {
-      setFeedback(error.message)
+      setFeedback(getUserFriendlyError(error))
     }
   }
 

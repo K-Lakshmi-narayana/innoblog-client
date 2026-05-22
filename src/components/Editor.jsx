@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   EditorContent,
   NodeViewWrapper,
@@ -131,11 +131,6 @@ function ResizableImageComponent({ node, updateAttributes, selected, deleteNode 
       height: canvas?.offsetHeight || (node.attrs.height || 320),
     }
     document.body.style.userSelect = 'none'
-  }
-
-  function handleFloatChange(newPosition) {
-    setPosition({ floatPosition: newPosition })
-    updateAttributes({ floatPosition: newPosition })
   }
 
   useEffect(() => {
@@ -389,67 +384,8 @@ const MonacoCodeBlockExtension = CodeBlock.extend({
   },
 })
 
-function ResizableTable({ node, updateAttributes, selected }) {
-  const [size, setSize] = useState({
-    width: node.attrs?.width || null,
-    height: node.attrs?.height || null,
-  })
+function ResizableTable({ node, selected }) {
   const containerRef = useRef(null)
-  const dragState = useRef({ axis: null, startX: 0, startY: 0, width: 0, height: 0 })
-
-  useEffect(() => {
-    function handleMouseMove(event) {
-      if (!dragState.current.axis) {
-        return
-      }
-
-      const dx = event.clientX - dragState.current.startX
-      const dy = event.clientY - dragState.current.startY
-      let nextWidth = dragState.current.width
-      let nextHeight = dragState.current.height
-
-      if (dragState.current.axis === 'horizontal' || dragState.current.axis === 'both') {
-        nextWidth = Math.max(200, dragState.current.width + dx)
-      }
-
-      if (dragState.current.axis === 'vertical' || dragState.current.axis === 'both') {
-        nextHeight = Math.max(100, dragState.current.height + dy)
-      }
-
-      updateAttributes({ width: nextWidth, height: nextHeight })
-      setSize({ width: nextWidth, height: nextHeight })
-    }
-
-    function handleMouseUp() {
-      if (!dragState.current.axis) {
-        return
-      }
-
-      dragState.current.axis = null
-      document.body.style.userSelect = ''
-    }
-
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [updateAttributes])
-
-  function startResize(axis, event) {
-    event.preventDefault()
-    const canvas = containerRef.current
-    dragState.current = {
-      axis,
-      startX: event.clientX,
-      startY: event.clientY,
-      width: canvas?.offsetWidth || 400,
-      height: canvas?.offsetHeight || 200,
-    }
-    document.body.style.userSelect = 'none'
-  }
 
   const headerColor = node.attrs?.tableHeaderColor
 
@@ -483,9 +419,14 @@ const ColoredTable = Table.extend({
       tableHeaderColor: {
         default: '#c53030',
         parseHTML: element => element.getAttribute('data-header-color') || '#c53030',
-        renderHTML: attributes => ({
-          'data-header-color': attributes.tableHeaderColor || '#c53030',
-        }),
+        renderHTML: attributes => {
+          const headerColor = attributes.tableHeaderColor || '#c53030'
+
+          return {
+            'data-header-color': headerColor,
+            style: `--header-color: ${headerColor}`,
+          }
+        },
       },
     }
   },
@@ -500,24 +441,32 @@ const ColoredBlockquote = Blockquote.extend({
     return {
       ...this.parent?.(),
       borderColor: {
-        default: '#ff2a2a',
-        parseHTML: element => element.style.borderLeftColor || element.getAttribute('data-border-color') || '#ff2a2a',
+        default: null,
+        parseHTML: element => {
+          const borderLeftColor = element.style.borderLeftColor
+          const dataAttr = element.getAttribute('data-border-color')
+          return borderLeftColor || dataAttr
+        },
         renderHTML: attributes => {
-          const color = attributes.borderColor || '#ff2a2a'
+          if (!attributes.borderColor) return {}
           return {
-            'data-border-color': color,
-            style: `border-left: 4px solid ${color};`,
+            'data-border-color': attributes.borderColor,
+            style: `border-left-color: ${attributes.borderColor}`,
           }
         },
       },
       backgroundColor: {
-        default: 'rgba(255, 241, 241, 0.8)',
-        parseHTML: element => element.style.backgroundColor || element.getAttribute('data-background-color') || 'rgba(255, 241, 241, 0.8)',
+        default: null,
+        parseHTML: element => {
+          const bgColor = element.style.backgroundColor
+          const dataAttr = element.getAttribute('data-background-color')
+          return bgColor || dataAttr
+        },
         renderHTML: attributes => {
-          const color = attributes.backgroundColor || 'rgba(255, 241, 241, 0.8)'
+          if (!attributes.backgroundColor) return {}
           return {
-            'data-background-color': color,
-            style: `background-color: ${color};`,
+            'data-background-color': attributes.backgroundColor,
+            style: `background-color: ${attributes.backgroundColor}`,
           }
         },
       },
@@ -539,6 +488,7 @@ export default function Editor({ value, onChange }) {
       StarterKit.configure({
         codeBlock: false,
         blockquote: false,
+        link: false,
       }),
       MonacoCodeBlockExtension,
       ColoredBlockquote,
@@ -652,22 +602,29 @@ export default function Editor({ value, onChange }) {
 
   function handleSetQuoteColor(color) {
     const lightColor = lightenColor(color, 65) // Lighten by 65%
-    editor.chain().focus().updateAttributes('blockquote', { 
-      borderColor: color, 
-      backgroundColor: lightColor 
-    }).run()
+    // First ensure we're in a blockquote
+    if (!editor.isActive('blockquote')) {
+      editor.chain().focus().toggleBlockquote().run()
+    }
+    // Then set the color attributes
+    setTimeout(() => {
+      editor.chain().focus().updateAttributes('blockquote', { 
+        borderColor: color, 
+        backgroundColor: lightColor 
+      }).run()
+    }, 10)
   }
 
-  const handleTableColorClick = useCallback(() => {
+  function handleTableColorClick() {
     setTableColorPickerOpen((current) => !current)
-  }, [])
+  }
 
-  const handleSetTableColor = useCallback((color) => {
+  function handleSetTableColor(color) {
     setSelectedTableColor(color)
-    editor.chain().focus().updateAttributes('table', { 
-      tableHeaderColor: color 
+    editor.chain().focus().updateAttributes('table', {
+      tableHeaderColor: color,
     }).run()
-  }, [editor])
+  }
 
   function handleAddTable() {
     editor.chain().focus().insertTable({ rows: 2, cols: 2, withHeaderRow: true }).run()
@@ -918,13 +875,11 @@ export default function Editor({ value, onChange }) {
                 className="button button--ghost button--small"
                 type="button"
                 onClick={() => {
-                  if (!editor.isActive('blockquote')) {
-                    editor.chain().focus().toggleBlockquote().run()
-                  }
+                  editor.chain().focus().toggleBlockquote().run()
                   setQuoteColorPickerOpen(false)
                 }}
               >
-                Insert Quote
+                {editor.isActive('blockquote') ? 'Remove Quote' : 'Insert Quote'}
               </button>
               <button
                 className="button button--ghost button--small"

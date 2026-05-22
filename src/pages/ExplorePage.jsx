@@ -4,6 +4,7 @@ import { apiRequest } from '../api'
 import ArticleCard from '../components/ArticleCard'
 import LoadingDots from '../components/LoadingDots'
 import SectionHeading from '../components/SectionHeading'
+import { getUserFriendlyError } from '../utils/errorMessages'
 
 const SORT_OPTIONS = [
   { value: 'recent', label: 'Most recent' },
@@ -47,7 +48,7 @@ export default function ExplorePage({ domains }) {
         setTotalPages(data.totalPages || 1)
       } catch (fetchError) {
         if (!ignore) {
-          setError(fetchError.message)
+          setError(getUserFriendlyError(fetchError))
           setArticles([])
           setTotalCount(0)
           setTotalPages(1)
@@ -80,7 +81,10 @@ export default function ExplorePage({ domains }) {
     )
   }, [articles, deferredQuery])
 
-  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1)
+  const pageNumbers = Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+    const start = Math.max(1, page - 2)
+    return start + i
+  }).filter((p) => p <= totalPages)
 
   function handleSortChange(event) {
     setSort(event.target.value)

@@ -2,9 +2,19 @@ import { useEffect, useRef, useState } from 'react'
 
 import { apiRequest } from '../api'
 import Editor from '../components/Editor'
+import TagSelector from '../components/TagSelector'
 import LoadingDots from '../components/LoadingDots'
-import { domains, publishingChecklist } from '../data/siteContent'
+import { domainLookup, domains, publishingChecklist } from '../data/siteContent'
+import { getTagSuggestionsForDomain, normalizeTagKey } from '../data/tagSuggestions'
 import { estimateReadTime, stripHtml } from '../utils/articleUtils'
+import { getUserFriendlyError } from '../utils/errorMessages'
+import {
+  validateTitle,
+  validateSummary,
+  validateCoverLabel,
+  validateBody,
+  validateTags,
+} from '../utils/validations'
 
 const initialBody =
   '<p>Open with the core problem, explain your point of view, and leave the reader with one clear takeaway they can use.</p>'
@@ -19,7 +29,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
     title: '',
     summary: '',
     domain: 'ml',
-    tags: '',
+    tags: [],
     coverLabel: '',
     coverImage: '',
     body: initialBody,
@@ -34,6 +44,8 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
   const [draftStatus, setDraftStatus] = useState('saved locally')
   const [loadedDraft, setLoadedDraft] = useState(false)
   const [showDraftSavedNotification, setShowDraftSavedNotification] = useState(false)
+  const [suggestedTags, setSuggestedTags] = useState(() => getTagSuggestionsForDomain('ml'))
+  const [loadingTags, setLoadingTags] = useState(false)
   const draftFromStorageRef = useRef(null)
 
   useEffect(() => {
@@ -48,6 +60,8 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
           setForm((currentForm) => ({
             ...currentForm,
             ...savedDraft,
+            // Ensure tags is an array
+            tags: Array.isArray(savedDraft.tags) ? savedDraft.tags : [],
           }))
           setDraftStatus('saved locally')
         }
@@ -58,6 +72,28 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
       setLoadedDraft(true)
     }
   }, [draftStorageKey])
+
+  useEffect(() => {
+    if (!form.domain) return
+
+    const fallbackTags = getTagSuggestionsForDomain(form.domain)
+    setSuggestedTags(fallbackTags)
+
+    async function fetchTags() {
+      setLoadingTags(true)
+      try {
+        const data = await apiRequest(`/tags/suggestions?domain=${form.domain}`)
+        setSuggestedTags(data.tags?.length ? data.tags : fallbackTags)
+      } catch (err) {
+        console.error('Failed to fetch tags:', err)
+        setSuggestedTags(fallbackTags)
+      } finally {
+        setLoadingTags(false)
+      }
+    }
+
+    fetchTags()
+  }, [form.domain])
 
   useEffect(() => {
     if (!loadedDraft || loadingArticle) {
@@ -79,10 +115,14 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
 
   const bodyText = stripHtml(form.body)
   const wordCount = bodyText ? bodyText.split(' ').filter(Boolean).length : 0
-  const tagPreview = form.tags
-    .split(',')
-    .map((tag) => tag.trim())
-    .filter(Boolean)
+  
+  // Handle both array and string formats for tags
+  const tagPreview = Array.isArray(form.tags)
+    ? form.tags
+    : (form.tags || '')
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean)
 
   const isEditing = Boolean(draftSlug || articleSlug)
   const editorTitle = draftSlug
@@ -112,7 +152,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
               title: data.draft.title || currentForm.title,
               summary: data.draft.summary || currentForm.summary,
               domain: data.draft.domain || currentForm.domain,
-              tags: (data.draft.tags || []).join(', '),
+              tags: Array.isArray(data.draft.tags) ? data.draft.tags : [],
               coverLabel: data.draft.coverLabel || currentForm.coverLabel,
               coverImage: data.draft.coverImage || currentForm.coverImage,
               body: data.draft.bodyHtml || currentForm.body,
@@ -128,7 +168,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
               title: data.article.title || currentForm.title,
               summary: data.article.summary || currentForm.summary,
               domain: data.article.domain || currentForm.domain,
-              tags: (data.article.tags || []).join(', '),
+              tags: Array.isArray(data.article.tags) ? data.article.tags : [],
               coverLabel: data.article.coverLabel || currentForm.coverLabel,
               coverImage: data.article.coverImage || currentForm.coverImage,
               body: data.article.bodyHtml || currentForm.body,
@@ -136,7 +176,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
           }
         }
       } catch (loadingError) {
-        setLoadError(loadingError.message)
+        setLoadError(getUserFriendlyError(loadingError))
       } finally {
         setLoadingArticle(false)
       }
@@ -150,19 +190,56 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
     setForm((currentForm) => ({
       ...currentForm,
       [name]: value,
+      ...(name === 'domain'
+        ? {
+            tags: currentForm.tags.filter((tag) =>
+              getTagSuggestionsForDomain(value)
+                .map(normalizeTagKey)
+                .includes(normalizeTagKey(tag)),
+            ),
+          }
+        : {}),
+    }))
+  }
+
+  function handleTagsChange(newTags) {
+    setForm((currentForm) => ({
+      ...currentForm,
+      tags: newTags,
     }))
   }
 
   async function handlePublish(event) {
     event.preventDefault()
 
-    if (!form.title.trim() || !form.summary.trim()) {
-      setError('Add a title and summary before publishing.')
+    // Validate all fields before publishing
+    const titleError = validateTitle(form.title)
+    if (titleError) {
+      setError(titleError)
       return
     }
 
-    if (bodyText.length < 120) {
-      setError('Add a little more detail to the article body before publishing.')
+    const summaryError = validateSummary(form.summary)
+    if (summaryError) {
+      setError(summaryError)
+      return
+    }
+
+    const bodyError = validateBody(form.body)
+    if (bodyError) {
+      setError(bodyError)
+      return
+    }
+
+    const tagsError = validateTags(form.tags, form.domain)
+    if (tagsError) {
+      setError(tagsError)
+      return
+    }
+
+    const coverLabelError = validateCoverLabel(form.coverLabel)
+    if (coverLabelError) {
+      setError(coverLabelError)
       return
     }
 
@@ -173,7 +250,6 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
       await onPublish(
         {
           ...form,
-          tags: tagPreview,
         },
         {
           articleId,
@@ -187,7 +263,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
         // Ignore failures.
       }
     } catch (publishError) {
-      setError(publishError.message)
+      setError(getUserFriendlyError(publishError))
     } finally {
       setSubmitting(false)
     }
@@ -196,8 +272,29 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
   async function handleSaveDraft(event) {
     event.preventDefault()
 
-    if (!form.title.trim() || !form.domain.trim() || !form.body.trim()) {
-      setError('Title, domain, and body are required to save a draft.')
+    // Validate required fields for draft
+    const titleError = validateTitle(form.title)
+    if (titleError) {
+      setError(titleError)
+      return
+    }
+
+    // Validate body exists and has minimum length
+    if (!form.body.trim()) {
+      setError('Article body is required.')
+      return
+    }
+
+    // Validate tags if provided
+    const tagsError = validateTags(form.tags, form.domain)
+    if (tagsError) {
+      setError(tagsError)
+      return
+    }
+
+    const coverLabelError = validateCoverLabel(form.coverLabel)
+    if (coverLabelError) {
+      setError(coverLabelError)
       return
     }
 
@@ -215,8 +312,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
         method,
         body: {
           ...form,
-          tags: tagPreview,
-          ...(draftId || !articleId ? { saveAsDraft: true } : {}),
+          saveAsDraft: true,
         },
       })
 
@@ -237,7 +333,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
         // Ignore failures.
       }
     } catch (draftError) {
-      setError(draftError.message)
+      setError(getUserFriendlyError(draftError))
     } finally {
       setSubmitting(false)
     }
@@ -347,7 +443,16 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
               placeholder="Example: The practical anatomy of an ML launch"
               value={form.title}
               onChange={updateField}
+              maxLength={200}
             />
+            <div className="field-meta">
+              <span className={`char-count ${form.title.length > 200 ? 'error' : ''}`}>
+                {form.title.length}/200
+              </span>
+              {validateTitle(form.title) && (
+                <span className="validation-error">{validateTitle(form.title)}</span>
+              )}
+            </div>
           </label>
 
           <label className="field">
@@ -369,7 +474,16 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
               placeholder="Example: Field Notes"
               value={form.coverLabel}
               onChange={updateField}
+              maxLength={100}
             />
+            <div className="field-meta">
+              <span className={`char-count ${form.coverLabel.length > 100 ? 'error' : ''}`}>
+                {form.coverLabel.length}/100
+              </span>
+              {validateCoverLabel(form.coverLabel) && (
+                <span className="validation-error">{validateCoverLabel(form.coverLabel)}</span>
+              )}
+            </div>
           </label>
 
           <label className="field field--wide">
@@ -380,19 +494,31 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
               placeholder="Give readers a sharp reason to click."
               value={form.summary}
               onChange={updateField}
+              maxLength={500}
             />
+            <div className="field-meta">
+              <span className={`char-count ${form.summary.length > 500 ? 'error' : ''}`}>
+                {form.summary.length}/500
+              </span>
+              {validateSummary(form.summary) && (
+                <span className="validation-error">{validateSummary(form.summary)}</span>
+              )}
+            </div>
           </label>
 
-          <label className="field field--wide">
-            <span>Tags</span>
-            <input
-              name="tags"
-              type="text"
-              placeholder="Modeling, Product, Metrics"
-              value={form.tags}
-              onChange={updateField}
+          <div className="field field--wide">
+            <TagSelector
+              selectedTags={form.tags}
+              onTagsChange={handleTagsChange}
+              domain={form.domain}
+              domainLabel={domainLookup[form.domain]?.name}
+              suggestedTags={suggestedTags}
             />
-          </label>
+            {validateTags(form.tags, form.domain) && (
+              <span className="validation-error">{validateTags(form.tags, form.domain)}</span>
+            )}
+            {loadingTags ? <span className="field-note">Refreshing tag suggestions...</span> : null}
+          </div>
 
           <label className="field field--wide">
             <span>Cover picture</span>

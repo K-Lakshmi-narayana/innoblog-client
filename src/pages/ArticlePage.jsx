@@ -6,6 +6,7 @@ import ArticleCard from '../components/ArticleCard'
 import ShareButton from '../components/ShareButton'
 import LoadingDots from '../components/LoadingDots'
 import { navigateTo } from '../hooks/useHashRoute'
+import { getUserFriendlyError } from '../utils/errorMessages'
 import {
   formatLongDate,
   formatShortDate,
@@ -17,6 +18,9 @@ import {
 export default function ArticlePage({ slug, session, onDeleteArticle }) {
   const [article, setArticle] = useState(null)
   const [comments, setComments] = useState([])
+  const [totalComments, setTotalComments] = useState(0)
+  const [commentPage, setCommentPage] = useState(1)
+  const [loadingMoreComments, setLoadingMoreComments] = useState(false)
   const [relatedArticles, setRelatedArticles] = useState([])
   const [recommendedArticles, setRecommendedArticles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -44,11 +48,13 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
 
         setArticle(data.article)
         setComments(data.comments)
+        setTotalComments(data.totalComments || 0)
+        setCommentPage(1)
         setRelatedArticles(data.relatedArticles)
         setRecommendedArticles([])
       } catch (loadError) {
         if (!ignore) {
-          setError(loadError.message)
+          setError(getUserFriendlyError(loadError))
           loadRecommendations()
         }
       } finally {
@@ -141,7 +147,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       )
       setInteractionError('')
     } catch (likeError) {
-      setInteractionError(likeError.message)
+      setInteractionError(getUserFriendlyError(likeError))
     }
   }
 
@@ -169,7 +175,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       )
       setInteractionError('')
     } catch (followError) {
-      setInteractionError(followError.message)
+      setInteractionError(getUserFriendlyError(followError))
     }
   }
 
@@ -195,6 +201,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       })
 
       setComments((currentComments) => [data.comment, ...currentComments])
+      setTotalComments((current) => current + 1)
       setArticle((currentArticle) =>
         currentArticle
           ? {
@@ -206,7 +213,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       setCommentBody('')
       setCommentError('')
     } catch (submitError) {
-      setCommentError(submitError.message)
+      setCommentError(getUserFriendlyError(submitError))
     }
   }
 
@@ -229,7 +236,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
         navigateTo('/articles')
       }
     } catch (deleteError) {
-      setDeleteError(deleteError.message)
+      setDeleteError(getUserFriendlyError(deleteError))
     }
   }
 
@@ -243,6 +250,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
         method: 'DELETE',
       })
       setComments((currentComments) => currentComments.filter((comment) => comment.id !== commentId))
+      setTotalComments((current) => Math.max(0, current - 1))
       setArticle((currentArticle) =>
         currentArticle
           ? {
@@ -253,12 +261,41 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       )
       setInteractionError('')
     } catch (deleteError) {
-      setInteractionError(deleteError.message)
+      setInteractionError(getUserFriendlyError(deleteError))
     }
   }
 
   const TEXT_NODE = 3
   const ELEMENT_NODE = 1
+
+  function parseStyleString(styleStr) {
+    const styles = {}
+    if (!styleStr) return styles
+
+    styleStr.split(';').forEach((rule) => {
+      const [property, value] = rule.split(':')
+      if (property && value) {
+        const trimmedProperty = property.trim()
+        if (trimmedProperty.startsWith('--')) {
+          styles[trimmedProperty] = value.trim()
+          return
+        }
+
+        const camelCaseProperty = property
+          .trim()
+          .split('-')
+          .map((part, index) => (index === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)))
+          .join('')
+        styles[camelCaseProperty] = value.trim()
+      }
+    })
+
+    return styles
+  }
+
+  function isSafeHeaderColor(value = '') {
+    return /^#[0-9a-f]{3,8}$/i.test(value.trim())
+  }
 
   function getCodeLanguageFromClassName(className = '') {
     const classMatch = className.match(/language-([a-zA-Z0-9]+)/)
@@ -364,6 +401,20 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
           tagProps.alt = attr.value
         } else if (attr.name === 'title') {
           tagProps.title = attr.value
+        } else if (attr.name === 'style') {
+          tagProps.style = {
+            ...(tagProps.style || {}),
+            ...parseStyleString(attr.value),
+          }
+        } else if (attr.name.startsWith('data-')) {
+          tagProps[attr.name] = attr.value
+
+          if (attr.name === 'data-header-color' && isSafeHeaderColor(attr.value)) {
+            tagProps.style = {
+              ...(tagProps.style || {}),
+              '--header-color': attr.value,
+            }
+          }
         }
       })
     }
@@ -411,7 +462,51 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       const parser = new DOMParser()
       const documentNode = parser.parseFromString(html, 'text/html')
       const nodes = Array.from(documentNode.body.childNodes)
-      return nodes.map((node, index) => renderHtmlNode(node, `article-body-${index}`))
+      const renderedNodes = nodes.map((node, index) => renderHtmlNode(node, `article-body-${index}`))
+      
+      // Create ad helper function
+      const createAdBanner = (key) => (
+        <div key={key} className="article-ad-banner">
+          <div className="ad-banner-content">
+            <span className="ad-label">Advertisement</span>
+            <a href="https://www.innomatics.in/" target="_blank" rel="noopener noreferrer" className="ad-banner-link">
+              <div className="ad-banner-box">
+                <div className="ad-banner-text">Discover More at Innomatics</div>
+                <div className="ad-banner-tagline">Explore cutting-edge AI & Tech solutions</div>
+              </div>
+            </a>
+          </div>
+        </div>
+      )
+      
+      // Inject multiple ads based on content length
+      if (renderedNodes.length > 8) {
+        // For longer articles, inject ads at multiple points
+        const positions = []
+        if (renderedNodes.length > 20) {
+          // 4 ads for very long articles
+          positions.push(Math.floor(renderedNodes.length * 0.25))
+          positions.push(Math.floor(renderedNodes.length * 0.5))
+          positions.push(Math.floor(renderedNodes.length * 0.75))
+        } else if (renderedNodes.length > 12) {
+          // 2 ads for medium articles
+          positions.push(Math.floor(renderedNodes.length * 0.33))
+          positions.push(Math.floor(renderedNodes.length * 0.66))
+        } else {
+          // 1 ad for shorter articles
+          positions.push(Math.floor(renderedNodes.length / 2))
+        }
+        
+        // Insert ads in reverse order to maintain correct indices
+        positions.reverse().forEach((pos, idx) => {
+          renderedNodes.splice(pos, 0, createAdBanner(`article-ad-banner-${idx}`))
+        })
+      } else if (renderedNodes.length > 4) {
+        // For short articles, add one ad in the middle
+        renderedNodes.splice(Math.floor(renderedNodes.length / 2), 0, createAdBanner('article-ad-banner'))
+      }
+      
+      return renderedNodes
     } catch (parseError) {
       console.error('Failed to parse article body HTML:', parseError)
       return null
@@ -446,6 +541,24 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       top: Math.max(0, elementTop - offset),
       behavior: 'smooth'
     })
+  }
+
+  async function handleLoadMoreComments() {
+    if (loadingMoreComments || !article) {
+      return
+    }
+
+    setLoadingMoreComments(true)
+
+    try {
+      const data = await apiRequest(`/articles/${article.id}/comments?page=${commentPage + 1}&limit=20`)
+      setComments((currentComments) => [...currentComments, ...data.comments])
+      setCommentPage(commentPage + 1)
+    } catch (loadError) {
+      setInteractionError(getUserFriendlyError(loadError))
+    } finally {
+      setLoadingMoreComments(false)
+    }
   }
 
   if (loading) {
@@ -542,6 +655,12 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
           </div>
 
           <div className="story-actions">
+            {canFollow ? (
+              <button className="button button--secondary" type="button" onClick={handleFollowAuthor}>
+                {article.author?.profile?.isFollowing ? 'Unfollow author' : 'Follow author'}
+              </button>
+            ) : null}
+
             {canManageArticle ? (
               <a className="button button--secondary" href={`#/article/${article.slug}/edit`}>
                 Edit article
@@ -604,6 +723,22 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
               <p>No headings were added to this article yet.</p>
             )}
           </div>
+          
+          {/* Vertical Ad Box */}
+          <a 
+            href="https://www.innomatics.in/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="panel sidebar-card vertical-ad-box"
+          >
+            <span className="ad-label">Sponsored</span>
+            <div className="ad-content">
+              <div className="ad-icon">📱</div>
+              <h4>Innomatics</h4>
+              <p>AI & Tech Solutions</p>
+              <div className="ad-button">Learn More →</div>
+            </div>
+          </a>
         </aside>
       </section>
 
@@ -695,24 +830,45 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
 
             <div className="comment-list">
               {comments.length ? (
-                comments.map((comment) => (
-                  <article key={comment.id} className="comment-card">
-                    <div className="comment-card__top">
-                      <strong>{getDisplayName(comment.author)}</strong>
-                      <span>{formatShortDate(comment.createdAt)}</span>
-                    </div>
-                    <p>{comment.body}</p>
-                    {(session?.user?.role === 'admin' || comment.author?.id === session?.user?.id || article.author?.id === session?.user?.id) ? (
+                <>
+                  {comments.map((comment) => (
+                    <article key={comment.id} className="comment-card">
+                      <div className="comment-card__top">
+                        <strong>{getDisplayName(comment.author)}</strong>
+                        <span>{formatShortDate(comment.createdAt)}</span>
+                      </div>
+                      <p>{comment.body}</p>
+                      {(session?.user?.role === 'admin' || comment.author?.id === session?.user?.id || article.author?.id === session?.user?.id) ? (
+                        <button
+                          type="button"
+                          className="button button--ghost button--small comment-delete"
+                          onClick={() => handleCommentDelete(comment.id)}
+                        >
+                          Delete comment
+                        </button>
+                      ) : null}
+                    </article>
+                  ))}
+                  {comments.length < totalComments ? (
+                    <div className="load-more-section">
                       <button
+                        className="button button--ghost"
                         type="button"
-                        className="button button--ghost button--small comment-delete"
-                        onClick={() => handleCommentDelete(comment.id)}
+                        onClick={handleLoadMoreComments}
+                        disabled={loadingMoreComments}
                       >
-                        Delete comment
+                        {loadingMoreComments ? (
+                          <>
+                            <span>Loading more comments</span>
+                            <LoadingDots />
+                          </>
+                        ) : (
+                          `Load more comments (${comments.length} of ${totalComments})`
+                        )}
                       </button>
-                    ) : null}
-                  </article>
-                ))
+                    </div>
+                  ) : null}
+                </>
               ) : (
                 <p>Be the first reader to comment on this story.</p>
               )}
