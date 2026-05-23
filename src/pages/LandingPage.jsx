@@ -73,10 +73,10 @@ export default function LandingPage({
     <div className="page-stack">
       <section className="hero panel">
         <div className="hero__content">
-          <span className="eyebrow">Connected editorial platform</span>
-          <h1>Read, Follow, Comment, and Publish in the World of AI and Modern Technology.</h1>
+          <span className="eyebrow">Discover quality articles</span>
+          <h1>The future belongs to people who understand AI. Master AI by learning one article at a time.</h1>
           <p>
-            Dive into insightful content across Artificial Intelligence, Machine Learning, Deep Learning, Data Science, and Computer Vision. Learn from ideas, share your thoughts, and contribute your own knowledge to a growing community of builders and innovators.
+            Explore a curated collection of articles written by experts in their fields. Discover new perspectives, learn from industry leaders, and engage with a thriving community of knowledge seekers. Read, share, and contribute your own insights.
           </p>
 
           <div className="hero__actions">
@@ -92,28 +92,31 @@ export default function LandingPage({
             >
               {session
                 ? session.user.canWrite
-                  ? 'Open the editor'
-                  : 'Open your profile'
-                : 'Login with OTP'}
+                  ? 'Write Article'
+                  : 'My Profile'
+                : 'Join Now'}
             </a>
             <a className="button button--secondary" href="#/articles">
-              Read articles
+              Explore Articles
             </a>
           </div>
 
-          <div className="hero__stats">
-            {heroMetrics.map((metric, index) => (
-              <div key={metric.label} className="stat-card">
-                <strong>{heroValues[index]}</strong>
-                <span>{metric.label}</span>
-              </div>
-            ))}
-          </div>
+          <a 
+            href="https://www.innomatics.in/register-now/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="panel sidebar-card vertical-ad-box"
+          >
+            <div className="ad-content">
+              <h4>Innomatics Research Labs</h4>
+              <p>Join Our Online & Offline Courses.</p>
+            </div>
+          </a>
         </div>
 
         {leadStory ? (
           <a className="spotlight-card" href={`#/article/${leadStory.slug}`}>
-            <span className="eyebrow">Featured reading</span>
+            <span className="eyebrow featured-spot">Featured article</span>
             <h2>{leadStory.title}</h2>
             <p>{leadStory.summary}</p>
             <div className="spotlight-card__footer">
@@ -123,12 +126,12 @@ export default function LandingPage({
           </a>
         ) : (
           <div className="spotlight-card spotlight-card--empty">
-            <span className="eyebrow">Editorial engine</span>
-            <h2>{loading ? 'Loading stories from the backend.' : 'The database is ready for stories.'}</h2>
+            <span className="eyebrow">Latest article</span>
+            <h2>{loading ? 'Loading published articles.' : 'No articles have been published yet.'}</h2>
             <p>
               {error
                 ? error
-                : 'Once the admin grants author access and articles are published, the homepage will fill in automatically.'}
+                : 'When authors publish their first pieces, the newest story will appear here.'}
             </p>
             {loading ? <LoadingDots /> : null}
           </div>
@@ -137,12 +140,12 @@ export default function LandingPage({
 
       <section>
         <SectionHeading
-          eyebrow="Top articles"
-          title="Start with the stories readers reach for first."
-          description="Start with our featured stories—carefully curated to bring you the most impactful ideas, deep insights, and real-world perspectives across multiple domains."
+          eyebrow="Trending now"
+          title="Discover what readers are talking about."
+          description="The most engaging and highly-rated articles are highlighted here for easy discovery."
           action={
             <a className="button button--ghost" href="#/top">
-              View leaderboard
+              See all trending
             </a>
           }
         />
@@ -155,7 +158,7 @@ export default function LandingPage({
           ) : (
             <div className="panel empty-panel">
               <strong>No featured stories yet.</strong>
-              <p>Likes and fresh publishing activity will build this section up.</p>
+              <p>Reader activity will shape this section as the publication grows.</p>
             </div>
           )}
         </div>
@@ -164,8 +167,8 @@ export default function LandingPage({
       <section>
         <SectionHeading
           eyebrow="Browse by domain"
-          title="Discover content across specialized domains."
-          description="Explore structured domains that bring together focused insights in ML, DL, DS, NLP, CV, and MLOps—making learning intuitive and organized."
+          title="Follow the topics you care about."
+          description="Each domain keeps related articles together, from machine learning and NLP to MLOps and statistics."
         />
 
         <div className="domain-grid">
@@ -184,12 +187,12 @@ export default function LandingPage({
 
       <section>
         <SectionHeading
-          eyebrow="Latest dispatches"
-          title="Explore the latest published articles."
-          description="Stay up to date with the latest articles, covering emerging trends and innovations in modern technology."
+          eyebrow="Latest articles"
+          title="Fresh writing from the publication."
+          description="New posts appear here as soon as they are published."
           action={
             <a className="button button--ghost" href="#/articles">
-              Explore all
+              View all
             </a>
           }
         />
@@ -203,8 +206,7 @@ export default function LandingPage({
             <div className="panel empty-panel">
               <strong>No articles published yet.</strong>
               <p>
-                Login as the admin account or grant author access to start
-                building the reading feed.
+                Grant author access or publish the first piece to start the feed.
               </p>
             </div>
           )}
@@ -215,46 +217,44 @@ export default function LandingPage({
         <div className="cta-content">
           <div className="cta-guidelines">
             <div>
-              <span className="eyebrow">Publish request</span>
-              <h2>Send your article details to publish.</h2>
+              <span className="eyebrow">Submit your article</span>
+              <h2>Share your knowledge with our readers.</h2>
               <p>
-                Fill in your contact info, article details, and credit author fields. The admin will receive your request by email and follow up with publishing access.
+                Submit your article for review. Our editorial team will evaluate it against our guidelines. Approved articles will be published and shared with our growing community of readers.
               </p>
             </div>
 
             <div className="guidelines-card">
-              <span className="eyebrow">Article guidelines</span>
+              <span className="eyebrow">Submission guidelines</span>
               <h3>What we're looking for</h3>
               
               <div className="guideline-section">
-                <strong>Content Quality</strong>
+                <strong>Article quality</strong>
                 <ul>
-                  <li>Original, well-researched articles</li>
-                  <li>Clear and engaging writing style</li>
-                  <li>Practical insights and real-world examples</li>
-                  <li>Minimum 800 words for substance</li>
+                  <li>Well-researched and original content</li>
+                  <li>Clear structure with compelling arguments</li>
+                  <li>Practical insights or actionable advice</li>
+                  <li>Thoroughly edited and polished writing</li>
                 </ul>
               </div>
 
               <div className="guideline-section">
-                <strong>Domain Focus</strong>
+                <strong>Content focus</strong>
                 <ul>
-                  <li>Artificial Intelligence</li>
-                  <li>Machine Learning</li>
-                  <li>Deep Learning</li>
-                  <li>Data Science</li>
-                  <li>Computer Vision</li>
+                  <li>Technology and innovation</li>
+                  <li>Business and strategy</li>
+                  <li>Trending topics and analysis</li>
+                  <li>Expert perspectives and case studies</li>
                 </ul>
               </div>
 
               <div className="guideline-section">
-                <strong>Publishing Process</strong>
+                <strong>Publication process</strong>
                 <ul>
-                  <li>Submit article details and Google Docs link</li>
-                  <li>Admin reviews your submission</li>
-                  <li>Receive author access via email</li>
-                  <li>Publish directly or request review</li>
-                  <li>Earn follows and engagement</li>
+                  <li>Submit your article with full details</li>
+                  <li>Our team reviews within 5-7 business days</li>
+                  <li>Receive editorial feedback or approval</li>
+                  <li>Your article goes live immediately upon approval</li>
                 </ul>
               </div>
             </div>
@@ -371,7 +371,7 @@ export default function LandingPage({
           {publishFeedback ? <p className="form-message">{publishFeedback}</p> : null}
 
           <button className="button button--primary" type="submit" disabled={publishLoading}>
-            {publishLoading ? 'Sending request…' : 'Send request to admin'}
+            {publishLoading ? 'Sending request...' : 'Send request'}
           </button>
         </form>
         </div>

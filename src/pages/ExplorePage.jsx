@@ -108,18 +108,17 @@ export default function ExplorePage({ domains }) {
     <div className="page-stack">
       <section className="page-banner panel">
         <div>
-          <span className="eyebrow">Reading room</span>
-          <h1>Read across the full publication in a full-width feed.</h1>
+          <span className="eyebrow">Article directory</span>
+          <h1>Explore all our published content.</h1>
           <p>
-            Search the live article index, jump into a domain feed, and move
-            through the content without losing the connected reading context.
+            Search by keyword, filter by topic, or sort by popularity and date to find exactly what you're looking for.
           </p>
         </div>
         <div className="page-banner__pills">
           {domains.map((domain) => (
             <a key={domain.slug} className="topic-pill" href={`#/domain/${domain.slug}`}>
               {domain.label}
-              <span>{domain.count} stories</span>
+              <span>{domain.count} articles</span>
             </a>
           ))}
         </div>
@@ -128,8 +127,8 @@ export default function ExplorePage({ domains }) {
       <section>
         <SectionHeading
           eyebrow="All articles"
-          title="From basics to breakthroughs—explore every article published."
-          description="Browse all articles and explore a complete collection of insights, ideas, and knowledge across technology and artificial intelligence."
+          title="Search and discover content easily."
+          description="Use search and filters to navigate through our collection of curated articles."
         />
 
         <div className="catalog-toolbar panel catalog-toolbar--wide">

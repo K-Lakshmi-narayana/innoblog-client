@@ -10,8 +10,8 @@ function isActive(currentPath, href) {
 export default function Sidebar({ currentPath, session }) {
   const navItems = [
     { label: 'Home', href: '/' },
-    { label: 'Explore', href: '/articles' },
-    { label: 'Top Stories', href: '/top' },
+    { label: 'Articles', href: '/articles' },
+    { label: 'Top Articles', href: '/top' },
     ...(session?.user?.canWrite ? [{ label: 'Write', href: '/create' }] : []),
     ...(session?.user?.role === 'admin' ? [{ label: 'Admin', href: '/profile/me' }] : []),
   ]
@@ -60,7 +60,7 @@ export default function Sidebar({ currentPath, session }) {
               className="sidebar-link"
               href="#/profile/me"
             >
-              My Profile
+            My profile
             </a>
           </div>
         )}

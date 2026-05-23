@@ -1,15 +1,22 @@
 import {
+  ARTICLE_IMAGE_LIMITS,
   getTagsPreview,
   sanitizeTags,
   validateBio,
+  validateArticleImages,
   validateBody,
   validateComment,
   validateHandle,
+  validateImageFile,
   validateName,
   validateSummary,
   validateTags,
   validateTitle,
 } from '../utils/validations'
+
+function buildDataImage(byteSize, mimeType = 'image/png') {
+  return `data:${mimeType};base64,${'A'.repeat(Math.ceil(byteSize / 3) * 4)}`
+}
 
 describe('frontend validation utilities', () => {
   it('validates article title and summary length boundaries', () => {
@@ -23,6 +30,30 @@ describe('frontend validation utilities', () => {
   it('validates article body based on plain text length', () => {
     expect(validateBody(`<p>${'A'.repeat(150)}</p>`)).toBeNull()
     expect(validateBody('<p>short</p>')).toContain('at least 120 characters')
+    expect(validateBody(`<p>${'A'.repeat(60001)}</p>`)).toContain(
+      'must not exceed 60,000 characters',
+    )
+  })
+
+  it('validates article image uploads by type, size, and embedded data URLs', () => {
+    expect(validateImageFile(new File(['ok'], 'cover.png', { type: 'image/png' }))).toBeNull()
+
+    const oversizedFile = new File(
+      [new Uint8Array(ARTICLE_IMAGE_LIMITS.maxBytes + 1)],
+      'large.png',
+      { type: 'image/png' },
+    )
+    expect(validateImageFile(oversizedFile, 'Cover image')).toContain('2 MB or smaller')
+
+    expect(
+      validateImageFile(new File(['svg'], 'diagram.svg', { type: 'image/svg+xml' })),
+    ).toContain('JPEG, PNG, WebP, or GIF')
+
+    expect(
+      validateArticleImages({
+        body: `<p>${'A'.repeat(150)}</p><img src="${buildDataImage(100, 'image/svg+xml')}" />`,
+      }),
+    ).toContain('JPEG, PNG, WebP, or GIF')
   })
 
   it('validates tag counts and tag lengths', () => {

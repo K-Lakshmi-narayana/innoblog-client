@@ -198,8 +198,8 @@ export default function TagSelector({
 
       <div id={infoId} className={`tag-selector__info ${!isValid ? 'is-invalid' : ''}`}>
         {selectedTags.length < MIN_ARTICLE_TAGS
-          ? `Select ${MIN_ARTICLE_TAGS - selectedTags.length} more tag(s).`
-          : `${MAX_ARTICLE_TAGS - selectedTags.length} tag(s) remaining.`}
+          ? `Select ${MIN_ARTICLE_TAGS - selectedTags.length} more tags.`
+          : `${MAX_ARTICLE_TAGS - selectedTags.length} tags remaining.`}
       </div>
     </div>
   )

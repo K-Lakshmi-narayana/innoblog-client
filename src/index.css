@@ -35,7 +35,7 @@ body {
 }
 
 body::selection {
-  background: var(--accent-soft);
+  background: rgba(180, 66, 66, 0.637);
 }
 
 a {

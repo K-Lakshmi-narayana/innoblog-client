@@ -202,14 +202,9 @@ function App() {
   }
 
   function handleAuthenticated(nextSession) {
-    console.log('[handleAuthenticated] Received session:', nextSession)
-    console.log('[handleAuthenticated] User email:', nextSession?.user?.email)
-    console.log('[handleAuthenticated] User canWrite:', nextSession?.user?.canWrite)
-    
     setSession({ user: nextSession.user })
     
     const redirectPath = nextSession.user.canWrite ? '/create' : '/articles'
-    console.log('[handleAuthenticated] Redirecting to:', redirectPath)
     navigateTo(redirectPath)
   }
 
@@ -231,30 +226,16 @@ function App() {
   }
 
   async function handleGoogleLogin(credential) {
-    console.log('[GoogleLogin Handler] Starting Google login with credential length:', credential?.length)
-    
-    try {
-      console.log('[GoogleLogin Handler] Making API request to /auth/google-login')
-      const authSession = await apiRequest('/auth/google-login', {
-        method: 'POST',
-        body: { credential },
-      })
-      
-      console.log('[GoogleLogin Handler] Full response:', authSession)
-      console.log('[GoogleLogin Handler] User object:', authSession.user)
-      console.log('[GoogleLogin Handler] Token:', authSession.token?.substring(0, 20) + '...')
-      
-      if (!authSession.user) {
-        throw new Error('No user in response')
-      }
-      
-      console.log('[GoogleLogin Handler] Calling handleAuthenticated with user:', authSession.user.email)
-      handleAuthenticated(authSession)
-      console.log('[GoogleLogin Handler] Authentication handled successfully')
-    } catch (error) {
-      console.error('[GoogleLogin Handler] Error:', error.message, error)
-      throw error
+    const authSession = await apiRequest('/auth/google-login', {
+      method: 'POST',
+      body: { credential },
+    })
+
+    if (!authSession.user) {
+      throw new Error('No user in response')
     }
+
+    handleAuthenticated(authSession)
   }
 
   async function handlePublish(draft, { articleId = '', draftId = '' } = {}) {
@@ -581,8 +562,8 @@ function App() {
         <span className="eyebrow">Not found</span>
         <h1>This page does not exist yet.</h1>
         <p>
-          The route is outside the current publishing flow. Head back home to
-          keep exploring the Medium-style experience.
+          That route is not part of the current publication. Head home or open
+          the article library to keep reading.
         </p>
         <a className="button button--primary" href="#/">
           Return home

@@ -106,15 +106,15 @@ export default function DomainPage({ domain }) {
         <section>
           <SectionHeading
             eyebrow="Domain highlight"
-            title="Lead article"
-            description="A strong first story sets the tone for the rest of the feed."
+            title="Start here"
+            description={`The latest ${domain.name} article opens the topic feed.`}
           />
           <ArticleCard article={leadStory} variant="feature" />
         </section>
       ) : (
         <section className="panel empty-panel">
           <strong>No articles are published in {domain.name} yet.</strong>
-          <p>The domain page is ready and will fill automatically when authors publish here.</p>
+          <p>New articles in this topic will appear here after publication.</p>
         </section>
       )}
 
@@ -122,7 +122,7 @@ export default function DomainPage({ domain }) {
         <SectionHeading
           eyebrow="More from this topic"
           title={`Continue reading in ${domain.name}.`}
-          description="Focused feeds help readers stay in a single subject area without extra navigation overhead."
+          description="Stay in one subject area and move through related articles at your own pace."
         />
 
         <div className="story-grid story-grid--two">

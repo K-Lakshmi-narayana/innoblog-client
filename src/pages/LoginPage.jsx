@@ -70,9 +70,6 @@ export default function LoginPage({ onRequestOtp, onVerifyOtp, onGoogleLogin, se
   }
 
   async function handleGoogleSuccess(credentialResponse) {
-    console.log('[GoogleSuccess] Called with response:', !!credentialResponse)
-    console.log('[GoogleSuccess] Has credential:', !!credentialResponse?.credential)
-    
     setLoading(true)
     setFeedback('')
     
@@ -80,29 +77,15 @@ export default function LoginPage({ onRequestOtp, onVerifyOtp, onGoogleLogin, se
       if (!credentialResponse || !credentialResponse.credential) {
         throw new Error('No credential in response')
       }
-      
-      console.log('[GoogleSuccess] Credential length:', credentialResponse.credential.length)
-      console.log('[GoogleSuccess] Calling onGoogleLogin...')
-      
-      const result = await onGoogleLogin(credentialResponse.credential)
-      
-      console.log('[GoogleSuccess] onGoogleLogin returned:', !!result)
-      console.log('[GoogleSuccess] Login completed successfully!')
-      
+
+      await onGoogleLogin(credentialResponse.credential)
     } catch (error) {
-      console.error('[GoogleSuccess] Error:', {
-        message: error.message,
-        status: error.status,
-        code: error.code,
-        details: error.details,
-      })
       setFeedback(getUserFriendlyError(error))
       setLoading(false)
     }
   }
 
   function handleGoogleError() {
-    console.error('[GoogleError] Google sign-in encountered an error')
     setFeedback('Google login failed. Please try again.')
     setLoading(false)
   }
@@ -114,8 +97,8 @@ export default function LoginPage({ onRequestOtp, onVerifyOtp, onGoogleLogin, se
           <span className="eyebrow">You are already signed in</span>
           <h1>{session.user.profile?.displayName || 'Your account'} is ready.</h1>
           <p>
-            Your OTP session is active. Head into the reading feed, open your
-            profile, or publish if the admin has already granted author access.
+            You can continue reading, update your profile, or open the editor if
+            you have writer access.
           </p>
           <div className="hero__actions">
             <a
@@ -136,10 +119,10 @@ export default function LoginPage({ onRequestOtp, onVerifyOtp, onGoogleLogin, se
   return (
     <section className="auth-layout">
       <div className="panel auth-panel auth-panel--feature">
-        <span className="eyebrow">OTP authentication</span>
-        <h1>Explore, Learn, and Build in the world of Tech & AI</h1>
+        <span className="eyebrow">Join our community</span>
+        <h1>Create an account to engage with our articles.</h1>
         <p>
-          Sign in to access a curated platform of insightful articles and practical knowledge across multiple domains. Stay updated with the latest ideas, engage with meaningful content, and contribute your own voice to a growing community of developers and innovators.
+          Sign in with email or Google to access personalized features, save your favorite articles, comment on posts, and more. It only takes a few seconds to get started.
         </p>
 
         <div className="auth-benefits">
@@ -157,7 +140,7 @@ export default function LoginPage({ onRequestOtp, onVerifyOtp, onGoogleLogin, se
         onSubmit={step === 'request' ? handleRequestOtp : handleVerifyOtp}
       >
         <span className="eyebrow">Welcome back</span>
-        <h2>Sign in to InnoBlog</h2>
+        <h2>Sign in to your account</h2>
 
         {step === 'request' && (
           <>
@@ -227,8 +210,8 @@ export default function LoginPage({ onRequestOtp, onVerifyOtp, onGoogleLogin, se
         </button>
 
         <p className="fine-print">
-          Readers can sign in and interact with published work. Only authors and
-          admins can access the publishing studio.
+          Readers can comment on published work. Authors and admins can also use
+          the publishing studio.
         </p>
       </form>
     </section>

@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import MonacoEditor from '@monaco-editor/react'
+import katex from 'katex'
 
 import { apiRequest } from '../api'
 import ArticleCard from '../components/ArticleCard'
@@ -7,6 +8,7 @@ import ShareButton from '../components/ShareButton'
 import LoadingDots from '../components/LoadingDots'
 import { navigateTo } from '../hooks/useHashRoute'
 import { getUserFriendlyError } from '../utils/errorMessages'
+import { renderMathInHtml } from '../utils/mathRenderer'
 import {
   formatLongDate,
   formatShortDate,
@@ -343,6 +345,54 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
 
     const tagName = node.tagName.toLowerCase()
 
+    // Handle Tiptap Math nodes (saved as <div data-type="math">)
+    if (tagName === 'div' && node.getAttribute('data-type') === 'math') {
+      const latex = node.getAttribute('data-latex')
+      if (latex) {
+        try {
+          const rendered = katex.renderToString(latex, {
+            throwOnError: false,
+            displayMode: true,
+          })
+          return (
+            <div key={key} className="math-node math-render math-render--display">
+              <div
+                className="math-render"
+                dangerouslySetInnerHTML={{ __html: rendered }}
+              />
+            </div>
+          )
+        } catch (error) {
+          console.error('Failed to render math:', latex, error)
+          return (
+            <div key={key} className="math-error">
+              Invalid LaTeX: {latex}
+            </div>
+          )
+        }
+      }
+    }
+
+    // Handle custom math elements
+    if (tagName === 'math-inline' || tagName === 'math-display') {
+      const isDisplay = tagName === 'math-display'
+      return (
+        <span
+          key={key}
+          className={`math-render ${isDisplay ? 'math-render--display' : 'math-render--inline'}`}
+          dangerouslySetInnerHTML={{ __html: node.innerHTML }}
+        />
+      )
+    }
+
+    if (tagName === 'math-error') {
+      return (
+        <span key={key} className="math-error">
+          {node.textContent}
+        </span>
+      )
+    }
+
     if (tagName === 'pre') {
       const code = node.querySelector('code')
       const language = getCodeLanguageFromAttributes(code || node)
@@ -459,8 +509,11 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
 
   function parseArticleBody(html) {
     try {
+      // Apply math rendering first
+      const htmlWithMath = renderMathInHtml(html)
+      
       const parser = new DOMParser()
-      const documentNode = parser.parseFromString(html, 'text/html')
+      const documentNode = parser.parseFromString(htmlWithMath, 'text/html')
       const nodes = Array.from(documentNode.body.childNodes)
       const renderedNodes = nodes.map((node, index) => renderHtmlNode(node, `article-body-${index}`))
       
@@ -472,7 +525,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
             <a href="https://www.innomatics.in/" target="_blank" rel="noopener noreferrer" className="ad-banner-link">
               <div className="ad-banner-box">
                 <div className="ad-banner-text">Discover More at Innomatics</div>
-                <div className="ad-banner-tagline">Explore cutting-edge AI & Tech solutions</div>
+                <div className="ad-banner-tagline">Training, projects, and career support</div>
               </div>
             </a>
           </div>
@@ -733,10 +786,10 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
           >
             <span className="ad-label">Sponsored</span>
             <div className="ad-content">
-              <div className="ad-icon">📱</div>
+              <div className="ad-icon">IRL</div>
               <h4>Innomatics</h4>
-              <p>AI & Tech Solutions</p>
-              <div className="ad-button">Learn More →</div>
+              <p>Data and AI programs</p>
+              <div className="ad-button">Learn more</div>
             </div>
           </a>
         </aside>
@@ -755,7 +808,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
                 <span>{authorHeadline}</span>
                 <p>{article.author.profile?.bio || 'This author has not added a bio yet.'}</p>
                 <p className="author-meta">
-                  {article.author.profile?.followersCount || 0} followers · Published on{' '}
+                  {article.author.profile?.followersCount || 0} followers - Published on{' '}
                   {formatShortDate(article.publishedAt)}
                 </p>
                 {authorHandle ? (
@@ -773,7 +826,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
             <div className="engagement-actions">
               {articleIsPubliclyVisible ? (
                 <button className="button button--primary" type="button" onClick={handleLike}>
-                  {article.likedByMe ? '❤️ Unlike article' : '🤍 Like article'}
+                  {article.likedByMe ? 'Unlike article' : 'Like article'}
                 </button>
               ) : null}
 
@@ -810,14 +863,14 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       {articleIsPubliclyVisible ? (
         <section className="article-comments-section">
           <div className="panel">
-            <span className="eyebrow">Community discussion</span>
+            <span className="eyebrow">Discussion</span>
 
             <form className="comment-form" onSubmit={handleCommentSubmit}>
               <label className="field">
                 <span>Add a comment</span>
                 <input
                   type="text"
-                  placeholder="Share your reaction or question..."
+                  placeholder="Add a response or question"
                   value={commentBody}
                   onChange={(event) => setCommentBody(event.target.value)}
                 />
@@ -881,7 +934,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
         <div className="section-heading">
           <div>
             <span className="eyebrow">Related reads</span>
-            <h2>Keep moving through the publication.</h2>
+            <h2>Read something related.</h2>
           </div>
         </div>
 
@@ -890,7 +943,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
             relatedArticles.slice(0, 3).map((entry) => <ArticleCard key={entry.id} article={entry} />)
           ) : (
             <div className="panel empty-panel">
-              <strong>No related stories yet.</strong>
+              <strong>No related articles yet.</strong>
             </div>
           )}
         </div>

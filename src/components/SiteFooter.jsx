@@ -11,21 +11,21 @@ export default function SiteFooter({ domains }) {
             <img width={44} height={48} src={logo} alt="logo" />
             <span className="brand__wordmark">
               <strong>I N N O B L O G</strong>
-              <span>Your Daily Dose of Tech x AI</span>
+              <span>Explore knowledge and share insights</span>
             </span>
           </a>
           <p className="site-footer__note">
-            This platform is dedicated to sharing knowledge on technology and artificial intelligence through well-crafted articles, tutorials, and insights. Whether you're a beginner or an experienced developer, our goal is to make complex topics simple, practical, and accessible.
+            A vibrant community where readers and writers share knowledge, insights, and expertise across diverse topics.
           </p>
         </div>
 
         <div>
           <h3>Navigate</h3>
           <div className="footer-links">
-            <a href="#/">Landing</a>
-            <a href="#/articles">All Articles</a>
-            <a href="#/top">Top Articles</a>
-            <a href="#/create">Create Article</a>
+            <a href="#/">Home</a>
+            <a href="#/articles">Browse Articles</a>
+            <a href="#/top">Popular Articles</a>
+            <a href="#/create">Submit Article</a>
           </div>
         </div>
 
@@ -39,7 +39,7 @@ export default function SiteFooter({ domains }) {
             ))}
           </div>
           <div className="f-con-1">
-            <p className="f-ad">Contact: <a className="td-none" href="mailTo: info@innomatics.in">info@innomatics.in</a></p>
+            <p className="f-ad">Contact: <a className="td-none" href="mailto:info@innomatics.in">info@innomatics.in</a></p>
             <br />
             <div className="f-smedia-con">
               <a href="https://www.linkedin.com/school/innomatics-research-labs/" target="_blank" rel="noreferrer" className="f-smedia linked"><FaLinkedin /></a>
@@ -51,7 +51,7 @@ export default function SiteFooter({ domains }) {
         </div>
       </div>
       <center>
-        <p>© 2026 Innomatics Research Labs Pvt Ltd. All rights reserved.</p>
+        <p>&copy;Copyright 2026 Innomatics Research Labs &middot; All rights reserved.</p>
       </center>
     </footer>
   )

@@ -34,7 +34,7 @@ export default function AppHeader({ currentPath, session, onLogout }) {
   const navItems = [
     { label: 'Home', href: '/' },
     { label: 'Articles', href: '/articles' },
-    { label: 'Top Stories', href: '/top' },
+    { label: 'Top Articles', href: '/top' },
     ...(session?.user?.canWrite ? [{ label: 'Write', href: '/create' }] : []),
     ...(session ? [{ label: 'Profile', href: '/profile/me' }] : []),
   ]
@@ -48,7 +48,7 @@ export default function AppHeader({ currentPath, session, onLogout }) {
             <img width={55} height={55} src={isDarkMode ? logoDark : logo} alt="logo" />
             <span className="brand__wordmark">
               <strong>I N N O B L O G</strong>
-              <span>Your Daily Dose of Tech x AI </span>
+              <span>Explore knowledge and share insights</span>
             </span>
           </a>
           <span className='mobile-theme'><ThemeToggle /></span>

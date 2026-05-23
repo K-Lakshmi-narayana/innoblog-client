@@ -9,15 +9,20 @@ import { getTagSuggestionsForDomain, normalizeTagKey } from '../data/tagSuggesti
 import { estimateReadTime, stripHtml } from '../utils/articleUtils'
 import { getUserFriendlyError } from '../utils/errorMessages'
 import {
+  ARTICLE_IMAGE_LIMITS,
+  formatFileSize,
+  getUploadedImageCount,
+  validateArticleImages,
   validateTitle,
   validateSummary,
   validateCoverLabel,
   validateBody,
+  validateImageFile,
   validateTags,
 } from '../utils/validations'
 
 const initialBody =
-  '<p>Open with the core problem, explain your point of view, and leave the reader with one clear takeaway they can use.</p>'
+  '<p>Start with the problem, explain what changed your mind, and close with a takeaway readers can use.</p>'
 
 export default function CreateArticlePage({ onPublish, session, articleSlug, draftSlug }) {
   const draftStorageKey = draftSlug
@@ -37,6 +42,8 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
   const [draftId, setDraftId] = useState('')
   const [articleId, setArticleId] = useState('')
   const [error, setError] = useState('')
+  const [coverImageError, setCoverImageError] = useState('')
+  const [editorImageError, setEditorImageError] = useState('')
   const [loadError, setLoadError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [editorFullscreen, setEditorFullscreen] = useState(false)
@@ -123,6 +130,10 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
         .split(',')
         .map((tag) => tag.trim())
         .filter(Boolean)
+  const uploadedImageCount = getUploadedImageCount({
+    body: form.body,
+    coverImage: form.coverImage,
+  })
 
   const isEditing = Boolean(draftSlug || articleSlug)
   const editorTitle = draftSlug
@@ -187,6 +198,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
 
   function updateField(event) {
     const { name, value } = event.target
+    setError('')
     setForm((currentForm) => ({
       ...currentForm,
       [name]: value,
@@ -203,43 +215,46 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
   }
 
   function handleTagsChange(newTags) {
+    setError('')
     setForm((currentForm) => ({
       ...currentForm,
       tags: newTags,
     }))
   }
 
-  async function handlePublish(event) {
-    event.preventDefault()
-
-    // Validate all fields before publishing
+  function validateComposer({ requireSummary = true } = {}) {
     const titleError = validateTitle(form.title)
-    if (titleError) {
-      setError(titleError)
-      return
-    }
+    if (titleError) return titleError
 
-    const summaryError = validateSummary(form.summary)
-    if (summaryError) {
-      setError(summaryError)
-      return
+    if (requireSummary) {
+      const summaryError = validateSummary(form.summary)
+      if (summaryError) return summaryError
     }
 
     const bodyError = validateBody(form.body)
-    if (bodyError) {
-      setError(bodyError)
-      return
-    }
+    if (bodyError) return bodyError
 
     const tagsError = validateTags(form.tags, form.domain)
-    if (tagsError) {
-      setError(tagsError)
-      return
-    }
+    if (tagsError) return tagsError
 
     const coverLabelError = validateCoverLabel(form.coverLabel)
-    if (coverLabelError) {
-      setError(coverLabelError)
+    if (coverLabelError) return coverLabelError
+
+    const imageError = validateArticleImages({
+      body: form.body,
+      coverImage: form.coverImage,
+    })
+    if (imageError) return imageError
+
+    return null
+  }
+
+  async function handlePublish(event) {
+    event.preventDefault()
+
+    const validationError = validateComposer({ requireSummary: true })
+    if (validationError) {
+      setError(validationError)
       return
     }
 
@@ -272,29 +287,9 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
   async function handleSaveDraft(event) {
     event.preventDefault()
 
-    // Validate required fields for draft
-    const titleError = validateTitle(form.title)
-    if (titleError) {
-      setError(titleError)
-      return
-    }
-
-    // Validate body exists and has minimum length
-    if (!form.body.trim()) {
-      setError('Article body is required.')
-      return
-    }
-
-    // Validate tags if provided
-    const tagsError = validateTags(form.tags, form.domain)
-    if (tagsError) {
-      setError(tagsError)
-      return
-    }
-
-    const coverLabelError = validateCoverLabel(form.coverLabel)
-    if (coverLabelError) {
-      setError(coverLabelError)
+    const validationError = validateComposer({ requireSummary: false })
+    if (validationError) {
+      setError(validationError)
       return
     }
 
@@ -357,14 +352,14 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
     return (
       <section className="panel gated-panel">
         <span className="eyebrow">Login required</span>
-        <h1>Authors need a local profile before they can publish.</h1>
+        <h1>Sign in before opening the editor.</h1>
         <p>
-          The rest of the article workflow is ready. Sign in first, then come
-          back here to create and publish directly into the article feeds.
+          Your account keeps drafts, review requests, and author details tied
+          to the same profile.
         </p>
         <div className="hero__actions">
           <a className="button button--primary" href="#/login">
-            Go to login
+            Sign in
           </a>
           <a className="button button--secondary" href="#/articles">
             Explore articles
@@ -378,10 +373,10 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
     return (
       <section className="panel gated-panel">
         <span className="eyebrow">Author access required</span>
-        <h1>Your account can read the publication, but it cannot publish yet.</h1>
+        <h1>Your account can read, but it cannot write yet.</h1>
         <p>
-          Admin and author accounts can compose articles here. If you do not have
-          author access yet, ask the admin to grant it.
+          Ask an admin for writer access when you are ready to draft and submit
+          articles.
         </p>
         <div className="hero__actions">
           <a className="button button--primary" href="#/profile/me">
@@ -426,10 +421,10 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
           <div>
             <span className="eyebrow">Compose</span>
             <h1>{isEditing ? editorTitle : 'Create a new article'}</h1>
-            <p>Write long-form content with structure, formatting, and metadata.</p>
+            <p>Draft the article, add discovery details, and submit it for publication.</p>
           </div>
           <div className="draft-status">
-            <span className="draft-status__icon">{draftStatus === 'autosaving' ? '⟳' : '✔'}</span>
+            <span className="draft-status__icon">{draftStatus === 'autosaving' ? 'Saving' : 'Saved'}</span>
             <span>{draftStatusLabel}</span>
           </div>
         </div>
@@ -440,7 +435,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
             <input
               name="title"
               type="text"
-              placeholder="Example: The practical anatomy of an ML launch"
+              placeholder="Example: A practical guide to launching an ML model"
               value={form.title}
               onChange={updateField}
               maxLength={200}
@@ -471,7 +466,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
             <input
               name="coverLabel"
               type="text"
-              placeholder="Example: Field Notes"
+              placeholder="Example: Case Study"
               value={form.coverLabel}
               onChange={updateField}
               maxLength={100}
@@ -491,7 +486,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
             <textarea
               name="summary"
               rows="4"
-              placeholder="Give readers a sharp reason to click."
+              placeholder="Summarize the promise of the article in one or two sentences."
               value={form.summary}
               onChange={updateField}
               maxLength={500}
@@ -525,10 +520,18 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
             <input
               name="coverImage"
               type="file"
-              accept="image/*"
+              accept={ARTICLE_IMAGE_LIMITS.allowedTypes.join(',')}
               onChange={async (event) => {
                 const file = event.target.files?.[0]
                 if (!file) {
+                  return
+                }
+
+                const validationError = validateImageFile(file, 'Cover image')
+                if (validationError) {
+                  setCoverImageError(validationError)
+                  setError(validationError)
+                  event.target.value = ''
                   return
                 }
 
@@ -538,6 +541,8 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
                     ...currentForm,
                     coverImage: reader.result || '',
                   }))
+                  setCoverImageError('')
+                  setError('')
                 }
                 reader.readAsDataURL(file)
               }}
@@ -547,8 +552,13 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
                 <img src={form.coverImage} alt="Cover preview" />
               </div>
             ) : (
-              <p className="field-note">Upload a cover image that will appear on the article page.</p>
+              <p className="field-note">
+                JPEG, PNG, WebP, or GIF up to {formatFileSize(ARTICLE_IMAGE_LIMITS.maxBytes)}.
+              </p>
             )}
+            {coverImageError ? (
+              <span className="validation-error">{coverImageError}</span>
+            ) : null}
           </label>
         </div>
 
@@ -556,30 +566,51 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
           <div className="editor-block__header">
             <div>
               <span className="eyebrow">Body</span>
-              <h2>Article editor</h2>
+              <h2>Write the article</h2>
             </div>
-            <div className="editor-block__stats">
-              <span>{wordCount} words</span>
-              <span>{estimateReadTime(form.body)}</span>
-            </div>
+          <div className="editor-block__stats">
+            <span>{wordCount} words</span>
+            <span>{estimateReadTime(form.body)}</span>
+            <span>
+              {uploadedImageCount}/{ARTICLE_IMAGE_LIMITS.maxUploadedImages} images
+            </span>
+          </div>
             <button
               type="button"
               className="button button--ghost"
               onClick={() => setEditorFullscreen((value) => !value)}
             >
-              {editorFullscreen ? 'Exit full screen' : 'Expand editor'}
+            {editorFullscreen ? 'Exit full screen' : 'Expand editor'}
             </button>
           </div>
 
-          <Editor value={form.body} onChange={(value) => setForm((currentForm) => ({
-            ...currentForm,
-            body: value,
-          }))} />
+          <Editor
+            value={form.body}
+            onChange={(value) => {
+              setEditorImageError('')
+              setForm((currentForm) => ({
+                ...currentForm,
+                body: value,
+              }))
+            }}
+            onError={(message) => {
+              setEditorImageError(message)
+              if (message) {
+                setError(message)
+              }
+            }}
+          />
+          {validateBody(form.body) ? (
+            <span className="validation-error">{validateBody(form.body)}</span>
+          ) : null}
+          {editorImageError ? (
+            <span className="validation-error">{editorImageError}</span>
+          ) : null}
         </div>
 
         {error ? <p className="form-message form-message--error">{error}</p> : null}
         {showDraftSavedNotification ? (
-          <p className="form-message form-message--success">✓ Draft saved successfully</p>
+          <p className="form-message form-message--success">Draft saved.</p>
         ) : null}
 
         <div className="composer-actions">
@@ -599,9 +630,9 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
 
       <aside className="composer-sidebar">
         <div className="panel composer-sidebar__card">
-          <span className="eyebrow">Live preview</span>
+          <span className="eyebrow">Article card</span>
           <h2>{form.title.trim() || 'Your article title'}</h2>
-          <p>{form.summary.trim() || 'Your summary will appear here as you write.'}</p>
+          <p>{form.summary.trim() || 'The summary will appear here as you write.'}</p>
           <div className="article-card__tags">
             {tagPreview.length ? (
               tagPreview.map((tag) => (
@@ -610,13 +641,13 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
                 </span>
               ))
             ) : (
-              <span className="tag">Add a few discovery tags</span>
+              <span className="tag">Choose tags</span>
             )}
           </div>
         </div>
 
         <div className="panel composer-sidebar__card">
-          <span className="eyebrow">Publishing checklist</span>
+          <span className="eyebrow">Before publishing</span>
           <div className="checklist">
             {publishingChecklist.map((item) => (
               <div key={item} className="checklist__item">
@@ -628,11 +659,11 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
         </div>
 
         <div className="panel composer-sidebar__card">
-          <span className="eyebrow">Author identity</span>
+          <span className="eyebrow">Author</span>
           <strong>{session.user.profile?.displayName}</strong>
           <p>
-            Publishing as {session.user.role}. Readers will be able to follow
-            this author profile from the article page.
+            Publishing as {session.user.role}. This profile appears with the
+            article and links back to your author page.
           </p>
         </div>
       </aside>

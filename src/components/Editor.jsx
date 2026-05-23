@@ -18,6 +18,7 @@ import { TextStyle } from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
 import Blockquote from '@tiptap/extension-blockquote'
 import MonacoEditor from '@monaco-editor/react'
+import { Math as MathExtension } from '../extensions/Math'
 import {
   FaBold,
   FaItalic,
@@ -35,7 +36,13 @@ import {
   FaTrash,
   FaCompress,
   FaExpand,
+  FaSquareRootAlt,
 } from 'react-icons/fa'
+import {
+  ARTICLE_IMAGE_LIMITS,
+  formatFileSize,
+  validateImageFile,
+} from '../utils/validations'
 
 function ToolbarButton({ active = false, icon, label, onClick, colorIndicator }) {
   return (
@@ -474,7 +481,7 @@ const ColoredBlockquote = Blockquote.extend({
   },
 })
 
-export default function Editor({ value, onChange }) {
+export default function Editor({ value, onChange, onError }) {
   const [selectedColor, setSelectedColor] = useState('#c53030')
   const [selectedTableColor, setSelectedTableColor] = useState('#c53030')
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
@@ -492,6 +499,7 @@ export default function Editor({ value, onChange }) {
       }),
       MonacoCodeBlockExtension,
       ColoredBlockquote,
+      MathExtension,
       TextStyle.configure({
         types: ['textStyle'],
       }),
@@ -562,10 +570,18 @@ export default function Editor({ value, onChange }) {
   function handleImageUpload(event) {
     const file = event.target.files?.[0]
     if (!file) return
+
+    const validationError = validateImageFile(file, 'Article image')
+    if (validationError) {
+      onError?.(validationError)
+      event.target.value = ''
+      return
+    }
     
     const reader = new FileReader()
     reader.onload = () => {
       editor.chain().focus().setImage({ src: reader.result }).run()
+      onError?.('')
       event.target.value = ''
     }
     reader.readAsDataURL(file)
@@ -735,6 +751,12 @@ export default function Editor({ value, onChange }) {
           icon={<FaImage />}
           label="Upload Image"
           onClick={handleImageClick}
+        />
+        <ToolbarButton
+          active={editor.isActive('math')}
+          icon={<FaSquareRootAlt />}
+          label="Math Formula"
+          onClick={() => editor.chain().focus().insertContent({ type: 'math' }).run()}
         />
         <ToolbarButton
           icon={<FaTable />}
@@ -927,7 +949,7 @@ export default function Editor({ value, onChange }) {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept={ARTICLE_IMAGE_LIMITS.allowedTypes.join(',')}
         hidden
         onChange={handleImageUpload}
       />
@@ -935,6 +957,9 @@ export default function Editor({ value, onChange }) {
       <div className="editor-surface">
         <EditorContent editor={editor} />
       </div>
+      <p className="field-note">
+        Images: JPEG, PNG, WebP, or GIF up to {formatFileSize(ARTICLE_IMAGE_LIMITS.maxBytes)} each.
+      </p>
     </div>
   )
 }

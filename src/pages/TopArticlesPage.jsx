@@ -9,10 +9,10 @@ export default function TopArticlesPage({ articles }) {
     <div className="page-stack">
       <section className="page-banner panel page-banner--split">
         <div>
-          <span className="eyebrow">Leaderboard</span>
-          <h1>Top articles ranked by live engagement.</h1>
+        <span className="eyebrow">Most popular</span>
+          <h1>Articles readers love the most.</h1>
           <p>
-            Explore the most engaging articles, ranked dynamically based on real-time reader activity.
+            Ranked by community engagement and readership, discover the articles making the biggest impact in our community.
           </p>
         </div>
         <a className="button button--primary" href="#/articles">
@@ -25,16 +25,16 @@ export default function TopArticlesPage({ articles }) {
           <ArticleCard article={leadStory} variant="feature" />
         ) : (
           <div className="panel empty-panel">
-            <strong>No ranked stories yet.</strong>
-            <p>Once articles gather likes and comments, the leaderboard will populate.</p>
+            <strong>No popular articles yet.</strong>
+            <p>As articles gain engagement, the most viewed pieces will appear here.</p>
           </div>
         )}
 
         <div className="panel leaderboard-list">
           <SectionHeading
-            eyebrow="Ranking"
-            title="Most discussed this week"
-            description="High-engagement stories with strong hooks, clarity, and practical depth."
+            eyebrow="Community favorites"
+            title="Top ranked articles"
+            description="Articles that generate the most interest and engagement from our readers."
           />
 
           {leaderboard.length ? (
@@ -62,8 +62,8 @@ export default function TopArticlesPage({ articles }) {
       <section>
         <SectionHeading
           eyebrow="More featured reads"
-          title="A premium reading lane for the strongest stories."
-          description="This keeps your publication feeling curated, not endless."
+          title="More articles worth opening."
+          description="A short path back into the strongest pieces in the archive."
         />
 
         <div className="story-grid story-grid--three">

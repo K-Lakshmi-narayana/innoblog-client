@@ -104,6 +104,9 @@ describe('CreateArticlePage', () => {
     fireEvent.change(screen.getByRole('textbox', { name: /^Title/ }), {
       target: { value: 'Draft Ready Story' },
     })
+    fireEvent.change(screen.getByLabelText('Article editor'), {
+      target: { value: `<p>${'Draft body with enough useful detail for validation. '.repeat(4)}</p>` },
+    })
     await selectDefaultTags()
     fireEvent.click(screen.getByRole('button', { name: /Save as Draft/i }))
 
@@ -120,7 +123,7 @@ describe('CreateArticlePage', () => {
       )
     })
 
-    expect(screen.getByText(/Draft saved successfully/i)).toBeInTheDocument()
+    expect(screen.getByText(/Draft saved/i)).toBeInTheDocument()
   })
 
   it('shows validation feedback instead of publishing invalid content', async () => {
@@ -176,5 +179,20 @@ describe('CreateArticlePage', () => {
     } finally {
       global.FileReader = originalFileReader
     }
+  })
+
+  it('shows a clear error when a cover image is too large', async () => {
+    render(<CreateArticlePage onPublish={vi.fn()} session={session} />)
+
+    const file = new File([new Uint8Array(2 * 1024 * 1024 + 1)], 'cover.png', {
+      type: 'image/png',
+    })
+    fireEvent.change(screen.getByLabelText(/Cover picture/i), {
+      target: { files: [file] },
+    })
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Cover image must be 2 MB or smaller/i).length).toBeGreaterThan(0)
+    })
   })
 })

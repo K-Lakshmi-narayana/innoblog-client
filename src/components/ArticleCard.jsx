@@ -47,11 +47,11 @@ export default function ArticleCard({ article, variant = 'default', href }) {
           <div>
             <strong>{authorName}</strong>
             <span>
-              {authorHeadline} · {activityLabel} · {article.readTime}
+              {authorHeadline} - {activityLabel} - {article.readTime}
             </span>
           </div>
           <span className="clap-count">
-            {article.likeCount} likes · {article.commentCount} comments
+            {article.likeCount} likes - {article.commentCount} comments
           </span>
         </div>
       </div>

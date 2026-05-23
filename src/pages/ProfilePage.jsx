@@ -367,7 +367,7 @@ export default function ProfilePage({
       await apiRequest(`/drafts/${draftId}/request-publication`, {
         method: 'POST',
       })
-      setFeedback('Publication request submitted successfully.')
+      setFeedback('Review request submitted.')
       await Promise.all([loadDrafts(), loadRequestedArticles(), loadPublications()])
       setActiveTab('requests')
     } catch (error) {
@@ -384,7 +384,7 @@ export default function ProfilePage({
       await apiRequest(`/drafts/${draftId}`, {
         method: 'DELETE',
       })
-      setFeedback('Draft removed successfully.')
+      setFeedback('Draft removed.')
       await Promise.all([loadDrafts(), loadRequestedArticles(), loadPublications()])
     } catch (error) {
       setFeedback(getUserFriendlyError(error))
@@ -400,7 +400,7 @@ export default function ProfilePage({
       await apiRequest(`/drafts/${draftId}/request-publication`, {
         method: 'DELETE',
       })
-      setFeedback('Publication request removed. The draft is back in drafts.')
+      setFeedback('Review request removed. The article is back in drafts.')
       await Promise.all([loadRequestedArticles(), loadDrafts(), loadPublications()])
       setActiveTab('drafts')
     } catch (error) {
@@ -414,7 +414,7 @@ export default function ProfilePage({
         method: 'POST',
         body: { notes: notes || '' },
       })
-      setFeedback('Article published successfully.')
+      setFeedback('Article published.')
       await Promise.all([loadPublicationRequests(), loadAdminMetrics(), loadPublications()])
       await onCatalogRefresh?.()
     } catch (error) {
@@ -455,7 +455,7 @@ export default function ProfilePage({
   if (requiresLogin) {
     return (
       <section className="panel empty-panel">
-        <strong>Please login first to open your own profile.</strong>
+        <strong>Please sign in to open your profile.</strong>
       </section>
     )
   }
@@ -551,8 +551,8 @@ export default function ProfilePage({
           <form className="panel profile-editor" onSubmit={handleSaveProfile}>
             <div className="section-heading section-heading--tight">
               <div>
-                <span className="eyebrow">Edit profile</span>
-                <h2>Update your public author card.</h2>
+              <span className="eyebrow">Edit profile</span>
+                <h2>Update your public author profile.</h2>
               </div>
             </div>
 
@@ -741,7 +741,7 @@ export default function ProfilePage({
             className={`profile-tab ${activeTab === 'requests' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('requests')}
           >
-            Requested for Publication ({requestedArticles.length})
+            In review ({requestedArticles.length})
           </button>
         )}
         {viewingSelf && session?.user?.role === 'admin' && (
@@ -749,7 +749,7 @@ export default function ProfilePage({
             className={`profile-tab ${activeTab === 'admin-requests' ? 'is-active' : ''}`}
             onClick={() => setActiveTab('admin-requests')}
           >
-            Review Requests ({publicationRequests.length})
+            Review queue ({publicationRequests.length})
           </button>
         )}
       </div>
@@ -830,7 +830,7 @@ export default function ProfilePage({
         <section>
           <div className="section-heading">
             <div>
-              <span className="eyebrow">Draft articles</span>
+              <span className="eyebrow">Drafts</span>
               <h2>Your drafts</h2>
             </div>
           </div>
@@ -856,21 +856,21 @@ export default function ProfilePage({
                       type="button"
                       onClick={() => navigateTo(`/draft/${article.slug}/edit`)}
                     >
-                      Edit Draft
+                      Edit draft
                     </button>
                     <button
                       className="button button--primary"
                       type="button"
                       onClick={() => handleRequestPublication(article.id)}
                     >
-                      Request Publication
+                      Request review
                     </button>
                     <button
                       className="button button--danger"
                       type="button"
                       onClick={() => handleDeleteDraft(article.id)}
                     >
-                      Remove Draft
+                      Remove draft
                     </button>
                   </div>
                 </div>
@@ -891,8 +891,8 @@ export default function ProfilePage({
         <section>
           <div className="section-heading">
             <div>
-              <span className="eyebrow">Requested for publication</span>
-              <h2>Requested articles</h2>
+              <span className="eyebrow">In review</span>
+              <h2>Articles waiting for review</h2>
             </div>
           </div>
 
@@ -915,14 +915,14 @@ export default function ProfilePage({
                       type="button"
                       onClick={() => navigateTo(`/draft/${article.slug}/edit`)}
                     >
-                      Edit Article
+                      Edit article
                     </button>
                     <button
                       className="button button--danger"
                       type="button"
                       onClick={() => handleRemovePublicationRequest(article.id)}
                     >
-                      Remove Request
+                      Remove request
                     </button>
                   </div>
                 </div>
@@ -940,8 +940,8 @@ export default function ProfilePage({
         <section>
           <div className="section-heading">
             <div>
-              <span className="eyebrow">Review publication requests</span>
-              <h2>Pending publication requests</h2>
+              <span className="eyebrow">Review queue</span>
+              <h2>Articles waiting for approval</h2>
             </div>
           </div>
 
@@ -973,7 +973,7 @@ export default function ProfilePage({
                       type="button"
                       onClick={() => navigateTo(`/draft/${request.draft.slug}/edit`)}
                     >
-                      View & Edit in Editor
+                      Open in editor
                     </button>
                     <button
                       className="button button--primary"
@@ -983,7 +983,7 @@ export default function ProfilePage({
                         handleApprovePublication(request.id, notes)
                       }}
                     >
-                      Approve & Publish
+                      Approve and publish
                     </button>
                     <button
                       className="button button--danger"

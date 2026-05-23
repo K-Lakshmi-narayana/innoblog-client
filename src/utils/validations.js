@@ -14,7 +14,8 @@ export const FIELD_LIMITS = {
   title: { min: 5, max: 200 },
   summary: { min: 10, max: 500 },
   coverLabel: { min: 0, max: 100 },
-  body: { min: 120 },
+  body: { min: 120, max: 60000 },
+  bodyHtml: { max: 150000 },
   
   // Tags
   tag: { max: MAX_ARTICLE_TAG_LENGTH },
@@ -27,6 +28,182 @@ export const FIELD_LIMITS = {
   name: { min: 2, max: 100 },
   bio: { max: 500 },
   handle: { min: 3, max: 30 },
+}
+
+export const ARTICLE_IMAGE_LIMITS = {
+  maxBytes: 2 * 1024 * 1024,
+  totalMaxBytes: 8 * 1024 * 1024,
+  maxUploadedImages: 8,
+  allowedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+}
+
+export function formatFileSize(bytes) {
+  if (bytes >= 1024 * 1024) {
+    const value = bytes / (1024 * 1024)
+    return `${Number.isInteger(value) ? value : value.toFixed(1)} MB`
+  }
+
+  return `${Math.ceil(bytes / 1024)} KB`
+}
+
+function formatNumber(value) {
+  return Number(value).toLocaleString('en-US')
+}
+
+function getDataUrlImageInfo(dataUrl = '') {
+  const match = String(dataUrl).match(/^data:([^;,]+)(;base64)?,([\s\S]*)$/i)
+
+  if (!match) {
+    return null
+  }
+
+  const mimeType = String(match[1] || '').toLowerCase()
+  const isBase64 = Boolean(match[2])
+  const payload = match[3] || ''
+  let byteSize = 0
+
+  if (isBase64) {
+    const cleanedPayload = payload.replace(/\s/g, '')
+    const paddingLength = cleanedPayload.endsWith('==')
+      ? 2
+      : cleanedPayload.endsWith('=')
+      ? 1
+      : 0
+
+    byteSize = Math.max(0, Math.floor((cleanedPayload.length * 3) / 4) - paddingLength)
+  } else {
+    try {
+      byteSize = new TextEncoder().encode(decodeURIComponent(payload)).length
+    } catch {
+      byteSize = new TextEncoder().encode(payload).length
+    }
+  }
+
+  return {
+    byteSize,
+    mimeType,
+  }
+}
+
+function getUploadedBodyImages(body = '') {
+  const images = []
+  const sourceHtml = String(body || '')
+  const imageRegex = /<img\b[^>]*\bsrc=(["'])(data:[^"']+)\1[^>]*>/gi
+  let match = imageRegex.exec(sourceHtml)
+
+  while (match) {
+    images.push(match[2])
+    match = imageRegex.exec(sourceHtml)
+  }
+
+  return images
+}
+
+function getHtmlLengthWithoutUploadedImages(body = '') {
+  return String(body || '').replace(/<img[^>]+src=["']data:[^"']*["'][^>]*>/gi, '').length
+}
+
+export function validateImageFile(file, label = 'Image') {
+  if (!file) {
+    return null
+  }
+
+  if (!ARTICLE_IMAGE_LIMITS.allowedTypes.includes(file.type)) {
+    return `${label} must be a JPEG, PNG, WebP, or GIF file.`
+  }
+
+  if (file.size > ARTICLE_IMAGE_LIMITS.maxBytes) {
+    return `${label} must be ${formatFileSize(ARTICLE_IMAGE_LIMITS.maxBytes)} or smaller. Choose a smaller image.`
+  }
+
+  return null
+}
+
+function validateDataUrlImage(dataUrl, label) {
+  const imageInfo = getDataUrlImageInfo(dataUrl)
+
+  if (!imageInfo) {
+    return {
+      byteSize: 0,
+      error: `${label} could not be read. Upload it again as a JPEG, PNG, WebP, or GIF image.`,
+    }
+  }
+
+  if (!ARTICLE_IMAGE_LIMITS.allowedTypes.includes(imageInfo.mimeType)) {
+    return {
+      byteSize: imageInfo.byteSize,
+      error: 'Article images must be JPEG, PNG, WebP, or GIF files.',
+    }
+  }
+
+  if (imageInfo.byteSize > ARTICLE_IMAGE_LIMITS.maxBytes) {
+    return {
+      byteSize: imageInfo.byteSize,
+      error: `${label} must be ${formatFileSize(ARTICLE_IMAGE_LIMITS.maxBytes)} or smaller. Choose a smaller image.`,
+    }
+  }
+
+  return {
+    byteSize: imageInfo.byteSize,
+    error: null,
+  }
+}
+
+export function getUploadedImageCount({ body = '', coverImage = '' } = {}) {
+  return [
+    ...(String(coverImage || '').trim().startsWith('data:') ? [coverImage] : []),
+    ...getUploadedBodyImages(body),
+  ].length
+}
+
+export function validateArticleImages({ body = '', coverImage = '' } = {}) {
+  const imageEntries = []
+  const trimmedCoverImage = String(coverImage || '').trim()
+
+  if (trimmedCoverImage.startsWith('data:')) {
+    imageEntries.push({
+      label: 'Cover image',
+      src: trimmedCoverImage,
+    })
+  }
+
+  getUploadedBodyImages(body).forEach((src, index) => {
+    imageEntries.push({
+      label: `Article image ${index + 1}`,
+      src,
+    })
+  })
+
+  if (imageEntries.length > ARTICLE_IMAGE_LIMITS.maxUploadedImages) {
+    return `Use up to ${ARTICLE_IMAGE_LIMITS.maxUploadedImages} uploaded images per article, including the cover image.`
+  }
+
+  let totalImageBytes = 0
+
+  for (const imageEntry of imageEntries) {
+    const validation = validateDataUrlImage(imageEntry.src, imageEntry.label)
+    totalImageBytes += validation.byteSize
+
+    if (validation.error) {
+      return validation.error
+    }
+  }
+
+  if (totalImageBytes > ARTICLE_IMAGE_LIMITS.totalMaxBytes) {
+    return `Uploaded article images must total ${formatFileSize(ARTICLE_IMAGE_LIMITS.totalMaxBytes)} or less.`
+  }
+
+  return null
+}
+
+export function validateArticlePayloadSize(body = '') {
+  const htmlLength = getHtmlLengthWithoutUploadedImages(body)
+
+  if (htmlLength > FIELD_LIMITS.bodyHtml.max) {
+    return `Article formatting is too large. Keep the article HTML under ${formatNumber(FIELD_LIMITS.bodyHtml.max)} characters, not counting uploaded images.`
+  }
+
+  return null
 }
 
 export function validateTitle(title) {
@@ -69,6 +246,13 @@ export function validateBody(body) {
   
   if (!plainText || plainText.length < FIELD_LIMITS.body.min) {
     return `Article body must have at least ${FIELD_LIMITS.body.min} characters.`
+  }
+  if (plainText.length > FIELD_LIMITS.body.max) {
+    return `Article body must not exceed ${formatNumber(FIELD_LIMITS.body.max)} characters.`
+  }
+  const payloadError = validateArticlePayloadSize(body)
+  if (payloadError) {
+    return payloadError
   }
   return null
 }

@@ -3,43 +3,43 @@ export const domains = [
     slug: 'ml',
     label: 'ML',
     name: 'Machine Learning',
-    description: 'Applied modeling, experimentation, and product-minded ML systems.',
+    description: 'Modeling practice, evaluation, and production lessons from real projects.',
   },
   {
     slug: 'dl',
     label: 'DL',
     name: 'Deep Learning',
-    description: 'Architectures, training strategy, and model behavior at scale.',
+    description: 'Training notes, architecture choices, and behavior you can reason about.',
   },
   {
     slug: 'ds',
     label: 'DS',
     name: 'Data Science',
-    description: 'Decision-making, metrics, storytelling, and analytical craft.',
+    description: 'Analysis, metrics, and clear explanations for better decisions.',
   },
   {
     slug: 'nlp',
     label: 'NLP',
     name: 'Natural Language Processing',
-    description: 'Language systems, prompting, evaluation, and text intelligence.',
+    description: 'Language systems, retrieval, prompting, and practical evaluation.',
   },
   {
     slug: 'cv',
     label: 'CV',
     name: 'Computer Vision',
-    description: 'Visual understanding, multimodal systems, and real-world perception.',
+    description: 'Image models, visual pipelines, and deployment notes from the field.',
   },
   {
     slug: 'mlops',
     label: 'MLOps',
     name: 'MLOps',
-    description: 'Pipelines, deployment, observability, and operational excellence.',
+    description: 'Pipelines, deployment, monitoring, and the work after a model ships.',
   },
   {
     slug: 'stats',
     label: 'Stats',
     name: 'Statistics',
-    description: 'Statistical methods, analysis, inference, and data interpretation.',
+    description: 'Inference, uncertainty, experiment design, and careful interpretation.',
   },
 ]
 
@@ -48,19 +48,19 @@ export const domainLookup = Object.fromEntries(
 )
 
 export const heroMetrics = [
-  { label: 'Technical domains' },
-  { label: 'Articles published' },
-  { label: 'Readers per day' },
+  { label: 'Topics' },
+  { label: 'Published articles' },
+  { label: 'Active authors' },
 ]
 
 export const loginBenefits = [
-  'Discover personalized articles tailored to your interests.',
-  'Follow domains that match your learning goals.',
-  'Write and publish your own insights with ease.',
+  'Create your profile and become part of our reading community.',
+  'Save favorite articles and bookmark content for later.',
+  'Write and publish your own articles to share with others.',
 ]
 
 export const publishingChecklist = [
-  'Use section headings so the table of contents can guide readers through the story.',
-  'Add a summary and tags so the article card feels sharp in the feed.',
-  'Keep your closing section practical so readers leave with a next step.',
+  'Use clear, descriptive section headings for easy navigation.',
+  'Write a compelling summary and select relevant tags.',
+  'End with a clear conclusion or actionable takeaway.',
 ]
