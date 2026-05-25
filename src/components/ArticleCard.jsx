@@ -7,7 +7,7 @@ export default function ArticleCard({ article, variant = 'default', href }) {
   const authorHeadline = getHeadline(article.author)
   const articleIsPublic =
     article.isPubliclyVisible ?? article.publicationStatus === 'published'
-  const targetHref = href || `#/article/${article.slug}`
+  const targetHref = href || `/article/${article.slug}`
   const activityLabel = articleIsPublic
     ? formatShortDate(article.publishedAt, 'Recently published')
     : article.publicationStatus === 'pending_review'
@@ -27,7 +27,7 @@ export default function ArticleCard({ article, variant = 'default', href }) {
       <div className="article-card__body">
         <div className="article-card__meta">
           <span className="pill pill--soft">{domain?.name ?? article.domain}</span>
-          {article.isTop ? <span className="pill pill--dark">Top story</span> : null}
+          {article.isTop ? <span className="pill pill--dark">Top article</span> : null}
         </div>
 
         <div className="article-card__copy">

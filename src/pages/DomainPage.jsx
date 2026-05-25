@@ -22,7 +22,7 @@ export default function DomainPage({ domain }) {
       setError('')
 
       try {
-        const data = await apiRequest(`/articles?domain=${domain.slug}&page=${page}&limit=${limit}`)
+        const data = await apiRequest(`/articles?topic=${domain.slug}&page=${page}&limit=${limit}`)
 
         if (ignore) {
           return
@@ -65,8 +65,8 @@ export default function DomainPage({ domain }) {
     return start + i
   }).filter((p) => p <= totalPages)
 
-  const leadStory = articles[0]
-  const remainingStories = articles.slice(1)
+  const leadArticle = articles[0]
+  const remainingArticles = articles.slice(1)
 
   if (loading) {
     return (
@@ -92,24 +92,24 @@ export default function DomainPage({ domain }) {
     <div className="page-stack">
       <section className="page-banner panel">
         <div>
-          <span className="eyebrow">{domain.label} domain</span>
+          <span className="eyebrow">{domain.label} topic</span>
           <h1>{domain.name} articles</h1>
           <p>{domain.description}</p>
         </div>
         <div className="page-banner__metric">
           <strong>{String(totalCount).padStart(2, '0')}</strong>
-          <span>stories in this domain</span>
+          <span>articles in this topic</span>
         </div>
       </section>
 
-      {leadStory ? (
+      {leadArticle ? (
         <section>
           <SectionHeading
-            eyebrow="Domain highlight"
+            eyebrow="Topic highlight"
             title="Start here"
             description={`The latest ${domain.name} article opens the topic feed.`}
           />
-          <ArticleCard article={leadStory} variant="feature" />
+          <ArticleCard article={leadArticle} variant="feature" />
         </section>
       ) : (
         <section className="panel empty-panel">
@@ -126,7 +126,7 @@ export default function DomainPage({ domain }) {
         />
 
         <div className="story-grid story-grid--two">
-          {remainingStories.map((article) => (
+          {remainingArticles.map((article) => (
             <ArticleCard key={article.id} article={article} />
           ))}
         </div>

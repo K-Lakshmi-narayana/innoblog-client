@@ -103,11 +103,11 @@ export default function LoginPage({ onRequestOtp, onVerifyOtp, onGoogleLogin, se
           <div className="hero__actions">
             <a
               className="button button--primary"
-              href={session.user.canWrite ? '#/create' : '#/profile/me'}
+              href={session.user.canWrite ? '/create' : '/profile/me'}
             >
               {session.user.canWrite ? 'Create article' : 'View profile'}
             </a>
-            <a className="button button--secondary" href="#/articles">
+            <a className="button button--secondary" href="/articles">
               Read articles
             </a>
           </div>
@@ -118,23 +118,6 @@ export default function LoginPage({ onRequestOtp, onVerifyOtp, onGoogleLogin, se
 
   return (
     <section className="auth-layout">
-      <div className="panel auth-panel auth-panel--feature">
-        <span className="eyebrow">Join our community</span>
-        <h1>Create an account to engage with our articles.</h1>
-        <p>
-          Sign in with email or Google to access personalized features, save your favorite articles, comment on posts, and more. It only takes a few seconds to get started.
-        </p>
-
-        <div className="auth-benefits">
-          {loginBenefits.map((benefit) => (
-            <div key={benefit} className="auth-benefit">
-              <span className="auth-benefit__bullet" />
-              <p>{benefit}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
       <form
         className="panel auth-panel auth-form"
         onSubmit={step === 'request' ? handleRequestOtp : handleVerifyOtp}
@@ -144,14 +127,14 @@ export default function LoginPage({ onRequestOtp, onVerifyOtp, onGoogleLogin, se
 
         {step === 'request' && (
           <>
-            <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
               <GoogleLogin
                 onSuccess={handleGoogleSuccess}
                 onError={handleGoogleError}
                 text="signin_with"
               />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ flex: 1, height: '1px', backgroundColor: '#ccc' }} />
               <span style={{ fontSize: '14px', color: '#666' }}>or</span>
               <div style={{ flex: 1, height: '1px', backgroundColor: '#ccc' }} />
@@ -209,10 +192,6 @@ export default function LoginPage({ onRequestOtp, onVerifyOtp, onGoogleLogin, se
           )}
         </button>
 
-        <p className="fine-print">
-          Readers can comment on published work. Authors and admins can also use
-          the publishing studio.
-        </p>
       </form>
     </section>
   )

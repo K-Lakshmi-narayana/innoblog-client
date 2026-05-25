@@ -102,7 +102,7 @@ describe('CreateArticlePage', () => {
     render(<CreateArticlePage onPublish={vi.fn()} session={session} />)
 
     fireEvent.change(screen.getByRole('textbox', { name: /^Title/ }), {
-      target: { value: 'Draft Ready Story' },
+      target: { value: 'Draft Ready Article' },
     })
     fireEvent.change(screen.getByLabelText('Article editor'), {
       target: { value: `<p>${'Draft body with enough useful detail for validation. '.repeat(4)}</p>` },
@@ -116,7 +116,7 @@ describe('CreateArticlePage', () => {
         expect.objectContaining({
           method: 'POST',
           body: expect.objectContaining({
-            title: 'Draft Ready Story',
+            title: 'Draft Ready Article',
             saveAsDraft: true,
           }),
         }),

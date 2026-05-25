@@ -123,7 +123,7 @@ function App() {
         const [articleResponse, topResponse, statsResponse] = await Promise.all([
           apiRequest('/articles'),
           apiRequest('/articles/top'),
-          apiRequest('/domains/stats'),
+        apiRequest('/topics/stats'),
         ])
 
         if (ignore) {
@@ -133,7 +133,7 @@ function App() {
         setArticles(articleResponse.articles)
         setTopArticles(topResponse.articles)
         
-        // Create a map of domain -> count
+        // Create a map of topic slug -> count.
         const statsMap = {}
         statsResponse.stats.forEach((stat) => {
           statsMap[stat.domain] = stat.count
@@ -167,20 +167,20 @@ function App() {
   const [rawPath, rawQuery] = currentPath.split('?')
   const normalizedPath = rawPath || '/'
   const pathSegments = normalizedPath.split('/').filter(Boolean)
-  const currentDomain = pathSegments[0] === 'domain' ? domainLookup[pathSegments[1]] : null
+  const currentTopic = pathSegments[0] === 'topic' ? domainLookup[pathSegments[1]] : null
   const searchParams = new URLSearchParams(rawQuery || '')
 
   async function refreshCatalog() {
     const [articleResponse, topResponse, statsResponse] = await Promise.all([
       apiRequest('/articles'),
       apiRequest('/articles/top'),
-      apiRequest('/domains/stats'),
+      apiRequest('/topics/stats'),
     ])
 
     setArticles(articleResponse.articles)
     setTopArticles(topResponse.articles)
     
-    // Create a map of domain -> count
+    // Create a map of topic slug -> count.
     const statsMap = {}
     statsResponse.stats.forEach((stat) => {
       statsMap[stat.domain] = stat.count
@@ -364,7 +364,7 @@ function App() {
         {
           title: 'Home feed failed to render.',
           description: 'The article catalog loaded into an unexpected state. Refresh and try again.',
-          actionHref: '#/articles',
+          actionHref: '/articles',
           actionLabel: 'Open articles',
           contextLabel: 'landing page',
         },
@@ -406,7 +406,7 @@ function App() {
         {
           title: 'The editor ran into a problem.',
           description: 'Your draft can be reopened from the dashboard after a refresh.',
-          actionHref: '#/profile/me?tab=drafts',
+          actionHref: '/profile/me?tab=drafts',
           actionLabel: 'Open dashboard',
           contextLabel: 'article editor',
         },
@@ -426,30 +426,30 @@ function App() {
         {
           title: 'The article feed failed to render.',
           description: 'Refresh the feed or open a different section while we recover.',
-          actionHref: '#/',
+          actionHref: '/',
           actionLabel: 'Return home',
           contextLabel: 'article feed',
         },
       )
     }
 
-    if (currentPath === '/top') {
+    if (currentPath === '/top-articles') {
       return renderWithBoundary(<TopArticlesPage articles={topArticles} />, {
-        title: 'Top stories are unavailable right now.',
+        title: 'Top articles are unavailable right now.',
         description: 'Try the main feed while this section recovers.',
-        actionHref: '#/articles',
+        actionHref: '/articles',
         actionLabel: 'Open articles',
         contextLabel: 'top articles page',
       })
     }
 
-    if (pathSegments[0] === 'domain' && currentDomain) {
-      return renderWithBoundary(<DomainPage domain={currentDomain} />, {
-        title: 'This domain page failed to render.',
+    if (pathSegments[0] === 'topic' && currentTopic) {
+      return renderWithBoundary(<DomainPage domain={currentTopic} />, {
+        title: 'This topic page failed to render.',
         description: 'Try reloading or head back to the broader article feed.',
-        actionHref: '#/articles',
+        actionHref: '/articles',
         actionLabel: 'Open articles',
-        contextLabel: 'domain page',
+        contextLabel: 'topic page',
       })
     }
 
@@ -478,7 +478,7 @@ function App() {
         {
           title: 'This draft editor failed to load.',
           description: 'The draft is still stored on the server. Refresh or reopen it from your dashboard.',
-          actionHref: '#/profile/me?tab=drafts',
+          actionHref: '/profile/me?tab=drafts',
           actionLabel: 'Open drafts',
           contextLabel: 'draft editor',
         },
@@ -510,7 +510,7 @@ function App() {
         {
           title: 'This article editor failed to load.',
           description: 'Refresh the page or reopen the article from your publications list.',
-          actionHref: '#/profile/me?tab=publications',
+          actionHref: '/profile/me?tab=publications',
           actionLabel: 'Open publications',
           contextLabel: 'article editor',
         },
@@ -528,8 +528,8 @@ function App() {
         ),
         {
           title: 'This article view failed to render.',
-          description: 'The story data may still be available. Refresh or open the main feed.',
-          actionHref: '#/articles',
+          description: 'The article data may still be available. Refresh or open the main feed.',
+          actionHref: '/articles',
           actionLabel: 'Browse articles',
           contextLabel: 'article page',
         },
@@ -550,7 +550,7 @@ function App() {
         {
           title: 'The dashboard failed to render.',
           description: 'Refresh the page or reopen the profile to recover drafts, requests, and publications.',
-          actionHref: '#/profile/me',
+          actionHref: '/profile/me',
           actionLabel: 'Open profile',
           contextLabel: 'profile dashboard',
         },
@@ -565,7 +565,7 @@ function App() {
           That route is not part of the current publication. Head home or open
           the article library to keep reading.
         </p>
-        <a className="button button--primary" href="#/">
+        <a className="button button--primary" href="/">
           Return home
         </a>
       </section>
@@ -591,7 +591,7 @@ function App() {
           resetKey={currentPath}
           title="The app hit an unexpected state."
           description="Refresh the page or head back home to continue reading."
-          actionHref="#/"
+          actionHref="/"
           actionLabel="Return home"
           contextLabel="app shell"
         >

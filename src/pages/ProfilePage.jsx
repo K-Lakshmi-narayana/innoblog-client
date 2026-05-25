@@ -7,6 +7,13 @@ import { navigateTo } from '../hooks/useHashRoute'
 import { getUserFriendlyError } from '../utils/errorMessages'
 import { getDisplayName, getHeadline, getInitials, withProtocol } from '../utils/articleUtils'
 
+const ARTICLE_SORT_OPTIONS = [
+  { value: 'recent', label: 'Newest' },
+  { value: 'top', label: 'Most liked' },
+  { value: 'a-z', label: 'A-Z' },
+  { value: 'z-a', label: 'Z-A' },
+]
+
 function getAllowedTabs(viewingSelf, role) {
   const canWrite = ['admin', 'author', 'writer'].includes(role)
   const tabs = [viewingSelf && canWrite ? 'publications' : 'articles']
@@ -56,6 +63,7 @@ export default function ProfilePage({
   })
   const [feedback, setFeedback] = useState('')
   const [activeTab, setActiveTab] = useState(initialTab || 'articles')
+  const [articleSort, setArticleSort] = useState('recent')
   const [drafts, setDrafts] = useState([])
   const [draftsLoading, setDraftsLoading] = useState(false)
   const [draftsError, setDraftsError] = useState('')
@@ -112,7 +120,7 @@ export default function ProfilePage({
     setPublicationsLoading(true)
     setPublicationsError('')
     try {
-      const data = await apiRequest(`/author/publications?page=${page}&limit=${limit}`)
+      const data = await apiRequest(`/author/publications?page=${page}&limit=${limit}&sort=${encodeURIComponent(articleSort)}`)
       setPublications(data.articles)
     } catch (error) {
       console.error('Failed to load publications:', error)
@@ -120,7 +128,7 @@ export default function ProfilePage({
     } finally {
       setPublicationsLoading(false)
     }
-  }, [canWrite, limit, page, session?.user, viewingSelf])
+  }, [articleSort, canWrite, limit, page, session?.user, viewingSelf])
 
   const loadDrafts = useCallback(async () => {
     if (!viewingSelf || !session?.user || !canWrite) return
@@ -185,7 +193,7 @@ export default function ProfilePage({
       }))
 
       try {
-        const data = await apiRequest(`${viewingSelf ? '/profiles/me' : `/profiles/${handle}`}?page=${page}&limit=${limit}`)
+        const data = await apiRequest(`${viewingSelf ? '/profiles/me' : `/profiles/${handle}`}?page=${page}&limit=${limit}&sort=${encodeURIComponent(articleSort)}`)
 
         if (ignore) {
           return
@@ -225,11 +233,15 @@ export default function ProfilePage({
     return () => {
       ignore = true
     }
-  }, [handle, requiresLogin, session, viewingSelf, page, limit])
+  }, [articleSort, handle, requiresLogin, session, viewingSelf, page, limit])
 
   useEffect(() => {
     setPage(1)
   }, [handle])
+
+  useEffect(() => {
+    setPage(1)
+  }, [articleSort])
 
   useEffect(() => {
     const allowedTabs = getAllowedTabs(viewingSelf, session?.user?.role)
@@ -489,7 +501,7 @@ export default function ProfilePage({
   const publicationHeading = viewingSelf && canWrite
     ? 'Your publications'
     : `${displayName}'s published articles`
-  const publicationEyebrow = viewingSelf && canWrite ? 'Publications' : 'Published stories'
+  const publicationEyebrow = viewingSelf && canWrite ? 'Publications' : 'Published articles'
 
   return (
     <div className="page-stack">
@@ -498,7 +510,6 @@ export default function ProfilePage({
           <div className="profile-banner">
             <span className="profile-banner__avatar">{getInitials(displayName)}</span>
             <div>
-              <span className="eyebrow">Profile</span>
               <h1>{displayName}</h1>
               <p>{headline}</p>
             </div>
@@ -524,25 +535,16 @@ export default function ProfilePage({
 
             {profile.website ? (
               <a className="button button--secondary" href={withProtocol(profile.website)} target="_blank" rel="noreferrer">
-                Visit website
+                Website
               </a>
             ) : null}
           </div>
         </div>
 
-        <div className="profile-hero__side">
-          <div className="profile-side-card">
-            <strong>Location</strong>
-            <span>{profile.location || 'Not added yet'}</span>
-          </div>
-          <div className="profile-side-card">
-            <strong>Handle</strong>
-            <span>@{profile.handle}</span>
-          </div>
-          <div className="profile-side-card">
-            <strong>Role</strong>
-            <span>{user.role}</span>
-          </div>
+        <div className="profile-hero__side profile-identity">
+          <span>@{profile.handle}</span>
+          {profile.location ? <span>{profile.location}</span> : null}
+          <span>{user.role}</span>
         </div>
       </section>
 
@@ -761,6 +763,19 @@ export default function ProfilePage({
               <span className="eyebrow">{publicationEyebrow}</span>
               <h2>{publicationHeading}</h2>
             </div>
+            <label className="profile-sort-control">
+              <span>Sort</span>
+              <select
+                value={articleSort}
+                onChange={(event) => setArticleSort(event.target.value)}
+              >
+                {ARTICLE_SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           {publicationsLoading && activeTab === 'publications' ? (
@@ -846,7 +861,7 @@ export default function ProfilePage({
             <div className="story-grid story-grid--two">
               {drafts.map((article) => (
                 <div key={article.id} className="draft-card">
-                  <ArticleCard article={article} href={`#/draft/${article.slug}/edit`} />
+                  <ArticleCard article={article} href={`/draft/${article.slug}/edit`} />
                   {article.publicationNotes ? (
                     <p className="draft-note">Review note: {article.publicationNotes}</p>
                   ) : null}
@@ -907,7 +922,7 @@ export default function ProfilePage({
             <div className="story-grid story-grid--two">
               {requestedArticles.map((article) => (
                 <div key={article.id} className="publication-card status-pending">
-                  <ArticleCard article={article} href={`#/draft/${article.slug}/edit`} />
+                  <ArticleCard article={article} href={`/draft/${article.slug}/edit`} />
                   <div className="publication-status">
                     <span className="status-badge status-pending">Pending review</span>
                     <button
@@ -964,7 +979,7 @@ export default function ProfilePage({
                   </div>
                   <p className="request-summary">{request.draft.summary}</p>
                   <div className="request-meta">
-                    <span>Domain: {request.draft.domain}</span>
+                    <span>Topic: {request.draft.domain}</span>
                     <span>Author: {request.author.email}</span>
                   </div>
                   <div className="request-actions">

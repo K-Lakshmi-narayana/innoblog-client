@@ -17,7 +17,7 @@ describe('article utilities', () => {
     expect(slugify(' Practical ML Launch Guide ')).toBe('practical-ml-launch-guide')
 
     vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
-    expect(slugify('!!!')).toBe('story-1700000000000')
+    expect(slugify('!!!')).toBe('article-1700000000000')
     Date.now.mockRestore()
   })
 

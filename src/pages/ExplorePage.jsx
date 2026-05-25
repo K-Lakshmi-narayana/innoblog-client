@@ -1,4 +1,5 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { FaMagnifyingGlass } from 'react-icons/fa6'
 
 import { apiRequest } from '../api'
 import ArticleCard from '../components/ArticleCard'
@@ -13,19 +14,18 @@ const SORT_OPTIONS = [
   { value: 'z-a', label: 'Z - A' },
 ]
 
-const LIMIT_OPTIONS = [5, 10, 20]
+const ARTICLES_PER_PAGE = 10
 
 export default function ExplorePage({ domains }) {
   const [query, setQuery] = useState('')
+  const [submittedQuery, setSubmittedQuery] = useState('')
   const [articles, setArticles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
-  const [limit, setLimit] = useState(10)
   const [sort, setSort] = useState('recent')
   const [totalCount, setTotalCount] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
-  const deferredQuery = useDeferredValue(query)
 
   useEffect(() => {
     let ignore = false
@@ -35,9 +35,18 @@ export default function ExplorePage({ domains }) {
       setError('')
 
       try {
-        const data = await apiRequest(
-          `/articles?page=${page}&limit=${limit}&sort=${encodeURIComponent(sort)}`,
-        )
+        const params = new URLSearchParams({
+          page: String(page),
+          limit: String(ARTICLES_PER_PAGE),
+          sort,
+        })
+        const searchTerm = submittedQuery.trim()
+
+        if (searchTerm) {
+          params.set('search', searchTerm)
+        }
+
+        const data = await apiRequest(`/articles?${params.toString()}`)
 
         if (ignore) {
           return
@@ -65,21 +74,7 @@ export default function ExplorePage({ domains }) {
     return () => {
       ignore = true
     }
-  }, [page, limit, sort])
-
-  const filteredArticles = useMemo(() => {
-    if (!deferredQuery.trim()) {
-      return articles
-    }
-
-    const normalizedQuery = deferredQuery.toLowerCase()
-    return articles.filter((article) =>
-      [article.title, article.summary, article.domain, ...(article.tags || [])]
-        .join(' ')
-        .toLowerCase()
-        .includes(normalizedQuery),
-    )
-  }, [articles, deferredQuery])
+  }, [page, sort, submittedQuery])
 
   const pageNumbers = Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
     const start = Math.max(1, page - 2)
@@ -91,8 +86,9 @@ export default function ExplorePage({ domains }) {
     setPage(1)
   }
 
-  function handleLimitChange(event) {
-    setLimit(Number(event.target.value))
+  function handleSearchSubmit(event) {
+    event.preventDefault()
+    setSubmittedQuery(query.trim())
     setPage(1)
   }
 
@@ -116,7 +112,7 @@ export default function ExplorePage({ domains }) {
         </div>
         <div className="page-banner__pills">
           {domains.map((domain) => (
-            <a key={domain.slug} className="topic-pill" href={`#/domain/${domain.slug}`}>
+            <a key={domain.slug} className="topic-pill" href={`/topic/${domain.slug}`}>
               {domain.label}
               <span>{domain.count} articles</span>
             </a>
@@ -131,16 +127,22 @@ export default function ExplorePage({ domains }) {
           description="Use search and filters to navigate through our collection of curated articles."
         />
 
-        <div className="catalog-toolbar panel catalog-toolbar--wide">
-          <label className="field">
-            <span>Search the feed</span>
-            <input
-              type="text"
-              placeholder="Search by title, summary, or tag"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
+        <form className="catalog-toolbar panel catalog-toolbar--wide" onSubmit={handleSearchSubmit}>
+          <div className="catalog-search">
+            <label className="field">
+              <span>Search the feed</span>
+              <input
+                type="text"
+                placeholder="Search by title, summary, or tag"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+            <button className="button button--primary catalog-search__button" type="submit" disabled={loading}>
+              <FaMagnifyingGlass aria-hidden="true" />
+              <span>Search</span>
+            </button>
+          </div>
 
           <div className="catalog-toolbar__controls">
             <label className="field field--small">
@@ -153,19 +155,8 @@ export default function ExplorePage({ domains }) {
                 ))}
               </select>
             </label>
-
-            <label className="field field--small">
-              <span>Per page</span>
-              <select value={limit} onChange={handleLimitChange}>
-                {LIMIT_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
           </div>
-        </div>
+        </form>
 
         <div className="story-grid story-grid--two">
           {loading ? (
@@ -180,21 +171,21 @@ export default function ExplorePage({ domains }) {
               <strong>Could not load articles.</strong>
               <p>{error}</p>
             </div>
-          ) : filteredArticles.length ? (
-            filteredArticles.map((article) => (
+          ) : articles.length ? (
+            articles.map((article) => (
               <ArticleCard key={article.id} article={article} />
             ))
           ) : (
             <div className="panel empty-panel">
-              <strong>No stories match the current search.</strong>
-              <p>Try a different title, tag, or domain term.</p>
+              <strong>No articles match the current search.</strong>
+              <p>Try a different title, tag, or topic term.</p>
             </div>
           )}
         </div>
 
         {!loading && !error && totalCount > 0 && (
           <div className="pagination-summary">
-            Showing {Math.min((page - 1) * limit + 1, totalCount)}-{Math.min(page * limit, totalCount)} of {totalCount} articles
+            Showing {Math.min((page - 1) * ARTICLES_PER_PAGE + 1, totalCount)}-{Math.min(page * ARTICLES_PER_PAGE, totalCount)} of {totalCount} articles
           </div>
         )}
 

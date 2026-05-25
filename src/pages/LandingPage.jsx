@@ -1,11 +1,65 @@
-import { useState } from 'react'
-import { heroMetrics } from '../data/siteContent'
+import { useEffect, useState } from 'react'
 import { apiRequest } from '../api'
 import ArticleCard from '../components/ArticleCard'
 import LoadingDots from '../components/LoadingDots'
 import SectionHeading from '../components/SectionHeading'
 import { getUserFriendlyError } from '../utils/errorMessages'
 import { getDisplayName } from '../utils/articleUtils'
+
+function getUniqueArticles(...articleLists) {
+  const seenArticles = new Set()
+  const uniqueArticles = []
+
+  articleLists.flat().forEach((article) => {
+    const key = article?.id || article?.slug
+
+    if (!key || seenArticles.has(key)) {
+      return
+    }
+
+    seenArticles.add(key)
+    uniqueArticles.push(article)
+  })
+
+  return uniqueArticles
+}
+
+function validateSuggestionForm(form) {
+  const errors = {}
+  const name = form.name.trim()
+  const email = form.email.trim()
+  const topicName = form.topicName.trim()
+  const articleTitle = form.articleTitle.trim()
+  const details = form.details.trim()
+
+  if (name.length < 2) {
+    errors.name = 'Add your name.'
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.email = 'Add a valid email address.'
+  }
+
+  if (!['topic', 'article'].includes(form.suggestionType)) {
+    errors.suggestionType = 'Choose what you want to suggest.'
+  }
+
+  if (form.suggestionType === 'topic' && topicName.length < 2) {
+    errors.topicName = 'Add the topic name.'
+  }
+
+  if (form.suggestionType === 'article' && articleTitle.length < 5) {
+    errors.articleTitle = 'Add the article idea.'
+  }
+
+  if (details.length < 15) {
+    errors.details = 'Add a little more detail so the team can understand it.'
+  } else if (details.length > 1000) {
+    errors.details = 'Keep the suggestion under 1000 characters.'
+  }
+
+  return errors
+}
 
 export default function LandingPage({
   articles,
@@ -15,57 +69,88 @@ export default function LandingPage({
   loading,
   error,
 }) {
-  const leadStory = topArticles[0] ?? articles[0]
-  const secondaryStories = topArticles.slice(1, 4)
-  const latestStories = articles.slice(0, 4)
-  const authorCount = new Set(
-    articles.map((article) => article.author?.id || article.author?.profile?.handle).filter(Boolean),
-  ).size
-  const heroValues = [
-    String(domains.length).padStart(2, '0'),
-    String(articles.length).padStart(2, '0'),
-    String(authorCount).padStart(2, '0'),
-  ]
-
-  const [publishForm, setPublishForm] = useState({
+  const featuredArticles = getUniqueArticles(topArticles, articles).slice(0, 3)
+  const secondaryArticles = topArticles.slice(3, 6)
+  const latestArticles = articles.slice(0, 4)
+  const [featuredIndex, setFeaturedIndex] = useState(0)
+  const [suggestionForm, setSuggestionForm] = useState({
     name: '',
     email: '',
+    suggestionType: 'topic',
+    topicName: '',
     articleTitle: '',
-    articleSummary: '',
-    googleDocsLink: '',
-    creditName: '',
-    creditEmail: '',
+    details: '',
   })
-  const [publishFeedback, setPublishFeedback] = useState('')
-  const [publishError, setPublishError] = useState('')
-  const [publishLoading, setPublishLoading] = useState(false)
+  const [suggestionErrors, setSuggestionErrors] = useState({})
+  const [suggestionFeedback, setSuggestionFeedback] = useState('')
+  const [suggestionError, setSuggestionError] = useState('')
+  const [suggestionLoading, setSuggestionLoading] = useState(false)
 
-  async function handlePublishRequest(event) {
+  useEffect(() => {
+    if (featuredArticles.length <= 1) {
+      return undefined
+    }
+
+    const timer = window.setInterval(() => {
+      setFeaturedIndex((index) => (index + 1) % featuredArticles.length)
+    }, 4500)
+
+    return () => window.clearInterval(timer)
+  }, [featuredArticles.length])
+
+  useEffect(() => {
+    if (featuredIndex >= featuredArticles.length) {
+      setFeaturedIndex(0)
+    }
+  }, [featuredArticles.length, featuredIndex])
+
+  function updateSuggestionField(event) {
+    const { name, value } = event.target
+
+    setSuggestionForm((current) => ({
+      ...current,
+      [name]: value,
+    }))
+
+    setSuggestionErrors((current) => ({
+      ...current,
+      [name]: '',
+    }))
+  }
+
+  async function handleSuggestionRequest(event) {
     event.preventDefault()
-    setPublishError('')
-    setPublishFeedback('')
-    setPublishLoading(true)
+    const validationErrors = validateSuggestionForm(suggestionForm)
+
+    setSuggestionError('')
+    setSuggestionFeedback('')
+    setSuggestionErrors(validationErrors)
+
+    if (Object.keys(validationErrors).length) {
+      return
+    }
+
+    setSuggestionLoading(true)
 
     try {
-      const data = await apiRequest('/publish-requests', {
+      const data = await apiRequest('/suggestions', {
         method: 'POST',
-        body: publishForm,
+        body: suggestionForm,
       })
 
-      setPublishFeedback(data.message)
-      setPublishForm({
+      setSuggestionFeedback(data.message)
+      setSuggestionForm({
         name: '',
         email: '',
+        suggestionType: 'topic',
+        topicName: '',
         articleTitle: '',
-        articleSummary: '',
-        googleDocsLink: '',
-        creditName: '',
-        creditEmail: '',
+        details: '',
       })
     } catch (error) {
-      setPublishError(getUserFriendlyError(error))
+      setSuggestionError(getUserFriendlyError(error))
     } finally {
-      setPublishLoading(false)
+      setSuggestionLoading(false)
     }
   }
 
@@ -85,9 +170,9 @@ export default function LandingPage({
               href={
                 session
                   ? session.user.canWrite
-                    ? '#/create'
-                    : '#/profile/me'
-                  : '#/login'
+                    ? '/create'
+                    : '/profile/me'
+                  : '/login'
               }
             >
               {session
@@ -96,7 +181,7 @@ export default function LandingPage({
                   : 'My Profile'
                 : 'Join Now'}
             </a>
-            <a className="button button--secondary" href="#/articles">
+            <a className="button button--secondary" href="/articles">
               Explore Articles
             </a>
           </div>
@@ -114,16 +199,42 @@ export default function LandingPage({
           </a>
         </div>
 
-        {leadStory ? (
-          <a className="spotlight-card" href={`#/article/${leadStory.slug}`}>
-            <span className="eyebrow featured-spot">Featured article</span>
-            <h2>{leadStory.title}</h2>
-            <p>{leadStory.summary}</p>
-            <div className="spotlight-card__footer">
-              <span>by {getDisplayName(leadStory.author)} - </span>
-              <span>{leadStory.readTime}</span>
+        {featuredArticles.length ? (
+          <div className="spotlight-card featured-carousel" aria-label="Featured articles">
+            <span className="eyebrow featured-spot">Featured articles</span>
+            <div className="featured-carousel__viewport">
+              <div
+                className="featured-carousel__track"
+                style={{ transform: `translateX(-${featuredIndex * 100}%)` }}
+              >
+                {featuredArticles.map((article) => (
+                  <a
+                    key={article.id || article.slug}
+                    className="featured-carousel__slide"
+                    href={`/article/${article.slug}`}
+                  >
+                    <h2>{article.title}</h2>
+                    <p>{article.summary}</p>
+                    <div className="spotlight-card__footer">
+                      <span>by {getDisplayName(article.author)} - </span>
+                      <span>{article.readTime}</span>
+                    </div>
+                  </a>
+                ))}
+              </div>
             </div>
-          </a>
+            <div className="featured-carousel__dots" aria-label="Featured article navigation">
+              {featuredArticles.map((article, index) => (
+                <button
+                  key={article.id || article.slug}
+                  className={`featured-carousel__dot${index === featuredIndex ? ' is-active' : ''}`}
+                  type="button"
+                  aria-label={`Show featured article ${index + 1}`}
+                  onClick={() => setFeaturedIndex(index)}
+                />
+              ))}
+            </div>
+          </div>
         ) : (
           <div className="spotlight-card spotlight-card--empty">
             <span className="eyebrow">Latest article</span>
@@ -131,75 +242,28 @@ export default function LandingPage({
             <p>
               {error
                 ? error
-                : 'When authors publish their first pieces, the newest story will appear here.'}
+                : 'When authors publish their first pieces, the newest article will appear here.'}
             </p>
             {loading ? <LoadingDots /> : null}
           </div>
         )}
       </section>
 
-      <section>
-        <SectionHeading
-          eyebrow="Trending now"
-          title="Discover what readers are talking about."
-          description="The most engaging and highly-rated articles are highlighted here for easy discovery."
-          action={
-            <a className="button button--ghost" href="#/top">
-              See all trending
-            </a>
-          }
-        />
-
-        <div className="story-grid story-grid--three">
-          {secondaryStories.length ? (
-            secondaryStories.map((article) => (
-              <ArticleCard key={article.id} article={article} variant="feature" />
-            ))
-          ) : (
-            <div className="panel empty-panel">
-              <strong>No featured stories yet.</strong>
-              <p>Reader activity will shape this section as the publication grows.</p>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section>
-        <SectionHeading
-          eyebrow="Browse by domain"
-          title="Follow the topics you care about."
-          description="Each domain keeps related articles together, from machine learning and NLP to MLOps and statistics."
-        />
-
-        <div className="domain-grid">
-          {domains.map((domain) => (
-            <a key={domain.slug} className="domain-card" href={`#/domain/${domain.slug}`}>
-              <div className="domain-card__top">
-                <span className="pill pill--soft">{domain.label}</span>
-                <strong>{String(domain.count).padStart(2, '0')} stories</strong>
-              </div>
-              <h3>{domain.name}</h3>
-              <p>{domain.description}</p>
-            </a>
-          ))}
-        </div>
-      </section>
-
-      <section>
+   <section>
         <SectionHeading
           eyebrow="Latest articles"
           title="Fresh writing from the publication."
           description="New posts appear here as soon as they are published."
           action={
-            <a className="button button--ghost" href="#/articles">
+            <a className="button button--ghost" href="/articles">
               View all
             </a>
           }
         />
 
         <div className="story-grid story-grid--two">
-          {latestStories.length ? (
-            latestStories.map((article) => (
+          {latestArticles.length ? (
+            latestArticles.map((article) => (
               <ArticleCard key={article.id} article={article} />
             ))
           ) : (
@@ -213,167 +277,201 @@ export default function LandingPage({
         </div>
       </section>
 
+
+      <section>
+        <SectionHeading
+          eyebrow="Trending now"
+          title="Discover what readers are talking about."
+          description="The most engaging and highly-rated articles are highlighted here for easy discovery."
+          action={
+            <a className="button button--ghost" href="/top-articles">
+              See all trending
+            </a>
+          }
+        />
+
+        <div className="story-grid story-grid--three">
+          {secondaryArticles.length ? (
+            secondaryArticles.map((article) => (
+              <ArticleCard key={article.id} article={article} variant="feature" />
+            ))
+          ) : (
+            <div className="panel empty-panel">
+              <strong>No featured articles yet.</strong>
+              <p>Reader activity will shape this section as the publication grows.</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section>
+        <SectionHeading
+          eyebrow="Browse by topic"
+          title="Follow the topics you care about."
+          description="Each topic keeps related articles together, from machine learning and NLP to MLOps and statistics."
+        />
+
+        <div className="domain-grid">
+          {domains.map((domain) => (
+            <a key={domain.slug} className="domain-card" href={`/topic/${domain.slug}`}>
+              <div className="domain-card__top">
+                <span className="pill pill--soft">{domain.label}</span>
+                <strong>{String(domain.count).padStart(2, '0')} articles</strong>
+              </div>
+              <h3>{domain.name}</h3>
+              <p>{domain.description}</p>
+            </a>
+          ))}
+        </div>
+      </section>
+
       <section className="cta-band panel">
         <div className="cta-content">
           <div className="cta-guidelines">
             <div>
-              <span className="eyebrow">Submit your article</span>
-              <h2>Share your knowledge with our readers.</h2>
+              <span className="eyebrow">Suggest what to cover next</span>
+              <h2>Ask for topics and articles you want to read.</h2>
               <p>
-                Submit your article for review. Our editorial team will evaluate it against our guidelines. Approved articles will be published and shared with our growing community of readers.
+                Tell the editorial team which extra topics should be added, or which article ideas would help you learn faster. Reader suggestions help shape the publication roadmap.
               </p>
             </div>
 
             <div className="guidelines-card">
-              <span className="eyebrow">Submission guidelines</span>
-              <h3>What we're looking for</h3>
+              <span className="eyebrow">Useful suggestions</span>
+              <h3>What helps the team decide</h3>
               
               <div className="guideline-section">
-                <strong>Article quality</strong>
+                <strong>For new topics</strong>
                 <ul>
-                  <li>Well-researched and original content</li>
-                  <li>Clear structure with compelling arguments</li>
-                  <li>Practical insights or actionable advice</li>
-                  <li>Thoroughly edited and polished writing</li>
+                  <li>Name the topic clearly</li>
+                  <li>Explain who would benefit from it</li>
+                  <li>Mention related tools, skills, or subtopics</li>
                 </ul>
               </div>
 
               <div className="guideline-section">
-                <strong>Content focus</strong>
+                <strong>For article ideas</strong>
                 <ul>
-                  <li>Technology and innovation</li>
-                  <li>Business and strategy</li>
-                  <li>Trending topics and analysis</li>
-                  <li>Expert perspectives and case studies</li>
+                  <li>Share the question you want answered</li>
+                  <li>Include the experience level if it matters</li>
+                  <li>Describe the outcome you want after reading</li>
                 </ul>
               </div>
 
               <div className="guideline-section">
-                <strong>Publication process</strong>
+                <strong>Review process</strong>
                 <ul>
-                  <li>Submit your article with full details</li>
-                  <li>Our team reviews within 5-7 business days</li>
-                  <li>Receive editorial feedback or approval</li>
-                  <li>Your article goes live immediately upon approval</li>
+                  <li>Suggestions are reviewed by the content team</li>
+                  <li>Popular requests are prioritized for planning</li>
+                  <li>Approved ideas may become new topics or articles</li>
                 </ul>
               </div>
             </div>
           </div>
 
-          <form className="composer-form cta-form" onSubmit={handlePublishRequest}>
-          <div className="composer-grid">
-            <label className="field">
-              <span>Your name</span>
-              <input
-                type="text"
-                value={publishForm.name}
-                onChange={(event) =>
-                  setPublishForm((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
-                }
-                required
-              />
-            </label>
+          <form className="composer-form cta-form" onSubmit={handleSuggestionRequest}>
+            <div className="composer-grid">
+              <label className="field">
+                <span>Your name</span>
+                <input
+                  name="name"
+                  type="text"
+                  value={suggestionForm.name}
+                  onChange={updateSuggestionField}
+                  aria-invalid={Boolean(suggestionErrors.name)}
+                />
+                {suggestionErrors.name ? <span className="validation-error">{suggestionErrors.name}</span> : null}
+              </label>
 
-            <label className="field">
-              <span>Your email</span>
-              <input
-                type="email"
-                value={publishForm.email}
-                onChange={(event) =>
-                  setPublishForm((current) => ({
-                    ...current,
-                    email: event.target.value,
-                  }))
-                }
-                required
-              />
-            </label>
+              <label className="field">
+                <span>Your email</span>
+                <input
+                  name="email"
+                  type="email"
+                  value={suggestionForm.email}
+                  onChange={updateSuggestionField}
+                  aria-invalid={Boolean(suggestionErrors.email)}
+                />
+                {suggestionErrors.email ? <span className="validation-error">{suggestionErrors.email}</span> : null}
+              </label>
 
-            <label className="field field--wide">
-              <span>Article title</span>
-              <input
-                type="text"
-                value={publishForm.articleTitle}
-                onChange={(event) =>
-                  setPublishForm((current) => ({
-                    ...current,
-                    articleTitle: event.target.value,
-                  }))
-                }
-                required
-              />
-            </label>
+              <label className="field field--wide">
+                <span>Suggestion type</span>
+                <select
+                  name="suggestionType"
+                  value={suggestionForm.suggestionType}
+                  onChange={updateSuggestionField}
+                  aria-invalid={Boolean(suggestionErrors.suggestionType)}
+                >
+                  <option value="topic">Extra topic to add</option>
+                  <option value="article">Article I want to read</option>
+                </select>
+                {suggestionErrors.suggestionType ? (
+                  <span className="validation-error">{suggestionErrors.suggestionType}</span>
+                ) : null}
+              </label>
 
-            <label className="field field--wide">
-              <span>Google Docs link</span>
-              <input
-                type="url"
-                value={publishForm.googleDocsLink}
-                onChange={(event) =>
-                  setPublishForm((current) => ({
-                    ...current,
-                    googleDocsLink: event.target.value,
-                  }))
-                }
-                required
-              />
-            </label>
+              {suggestionForm.suggestionType === 'topic' ? (
+                <label className="field field--wide">
+                  <span>Topic name</span>
+                  <input
+                    name="topicName"
+                    type="text"
+                    value={suggestionForm.topicName}
+                    onChange={updateSuggestionField}
+                    placeholder="Example: Agentic AI"
+                    aria-invalid={Boolean(suggestionErrors.topicName)}
+                  />
+                  {suggestionErrors.topicName ? (
+                    <span className="validation-error">{suggestionErrors.topicName}</span>
+                  ) : null}
+                </label>
+              ) : (
+                <label className="field field--wide">
+                  <span>Article idea</span>
+                  <input
+                    name="articleTitle"
+                    type="text"
+                    value={suggestionForm.articleTitle}
+                    onChange={updateSuggestionField}
+                    placeholder="Example: How vector databases work in production"
+                    aria-invalid={Boolean(suggestionErrors.articleTitle)}
+                  />
+                  {suggestionErrors.articleTitle ? (
+                    <span className="validation-error">{suggestionErrors.articleTitle}</span>
+                  ) : null}
+                </label>
+              )}
 
-            <label className="field field--wide">
-              <span>Article summary</span>
-              <textarea
-                rows="3"
-                value={publishForm.articleSummary}
-                onChange={(event) =>
-                  setPublishForm((current) => ({
-                    ...current,
-                    articleSummary: event.target.value,
-                  }))
-                }
-              />
-            </label>
+              <label className="field field--wide">
+                <span>Suggestion details</span>
+                <textarea
+                  name="details"
+                  rows="5"
+                  value={suggestionForm.details}
+                  onChange={updateSuggestionField}
+                  placeholder="Share why this would be useful and what you hope the article or topic covers."
+                  maxLength={1000}
+                  aria-invalid={Boolean(suggestionErrors.details)}
+                />
+                <div className="field-meta">
+                  <span className={`char-count ${suggestionForm.details.length > 1000 ? 'error' : ''}`}>
+                    {suggestionForm.details.length}/1000
+                  </span>
+                  {suggestionErrors.details ? (
+                    <span className="validation-error">{suggestionErrors.details}</span>
+                  ) : null}
+                </div>
+              </label>
+            </div>
 
-            <label className="field">
-              <span>Credit author name</span>
-              <input
-                type="text"
-                value={publishForm.creditName}
-                onChange={(event) =>
-                  setPublishForm((current) => ({
-                    ...current,
-                    creditName: event.target.value,
-                  }))
-                }
-                placeholder="Leave blank to use your name"
-              />
-            </label>
+            {suggestionError ? <p className="form-message form-message--error">{suggestionError}</p> : null}
+            {suggestionFeedback ? <p className="form-message form-message--success">{suggestionFeedback}</p> : null}
 
-            <label className="field">
-              <span>Credit author email</span>
-              <input
-                type="email"
-                value={publishForm.creditEmail}
-                onChange={(event) =>
-                  setPublishForm((current) => ({
-                    ...current,
-                    creditEmail: event.target.value,
-                  }))
-                }
-                placeholder="Leave blank to use your email"
-              />
-            </label>
-          </div>
-
-          {publishError ? <p className="form-message" style={{ color: '#b21f1f' }}>{publishError}</p> : null}
-          {publishFeedback ? <p className="form-message">{publishFeedback}</p> : null}
-
-          <button className="button button--primary" type="submit" disabled={publishLoading}>
-            {publishLoading ? 'Sending request...' : 'Send request'}
-          </button>
-        </form>
+            <button className="button button--primary" type="submit" disabled={suggestionLoading}>
+              {suggestionLoading ? 'Sending suggestion...' : 'Send suggestion'}
+            </button>
+          </form>
         </div>
       </section>
     </div>

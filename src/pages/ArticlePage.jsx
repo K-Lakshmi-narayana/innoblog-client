@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState } from 'react'
 import MonacoEditor from '@monaco-editor/react'
 import katex from 'katex'
+import { FaHeart, FaRegHeart } from 'react-icons/fa'
 
 import { apiRequest } from '../api'
 import ArticleCard from '../components/ArticleCard'
@@ -13,8 +14,6 @@ import {
   formatLongDate,
   formatShortDate,
   getDisplayName,
-  getHeadline,
-  getInitials,
 } from '../utils/articleUtils'
 
 export default function ArticlePage({ slug, session, onDeleteArticle }) {
@@ -85,20 +84,24 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
   }, [session, slug])
 
   useEffect(() => {
-    if (!article?.toc?.length) {
+    const tocHeadings = article?.toc?.filter((entry) => entry.level === 2) || []
+
+    if (!tocHeadings.length) {
       setActiveHeading('')
       return
     }
 
-    setActiveHeading(article.toc[0].id)
+    setActiveHeading(tocHeadings[0].id)
   }, [article?.id, article?.toc])
 
   useEffect(() => {
-    if (!article?.toc?.length) {
+    const tocHeadings = article?.toc?.filter((entry) => entry.level === 2) || []
+
+    if (!tocHeadings.length) {
       return undefined
     }
 
-    const headingElements = article.toc
+    const headingElements = tocHeadings
       .map((entry) => document.getElementById(entry.id))
       .filter(Boolean)
 
@@ -106,25 +109,31 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       return undefined
     }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visibleEntry = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((left, right) => left.boundingClientRect.top - right.boundingClientRect.top)[0]
+    let animationFrame = 0
 
-        if (visibleEntry) {
-          setActiveHeading(visibleEntry.target.id)
-        }
-      },
-      {
-        rootMargin: '-18% 0px -62% 0px',
-        threshold: [0, 1],
-      },
-    )
+    function updateActiveHeading() {
+      const activationOffset = 140
+      const currentHeading = headingElements.reduce((activeElement, element) => {
+        return element.getBoundingClientRect().top <= activationOffset ? element : activeElement
+      }, headingElements[0])
 
-    headingElements.forEach((element) => observer.observe(element))
+      setActiveHeading(currentHeading.id)
+    }
 
-    return () => observer.disconnect()
+    function handleScroll() {
+      window.cancelAnimationFrame(animationFrame)
+      animationFrame = window.requestAnimationFrame(updateActiveHeading)
+    }
+
+    updateActiveHeading()
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    window.addEventListener('resize', handleScroll)
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame)
+      window.removeEventListener('scroll', handleScroll)
+      window.removeEventListener('resize', handleScroll)
+    }
   }, [article?.id, article?.toc])
 
   async function handleLike() {
@@ -584,17 +593,34 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
     const element = document.getElementById(id)
     if (!element) return
 
-    const storyBody = document.querySelector('.story-body')
-    if (!storyBody) return
-
-    const elementTop = element.offsetTop
-    const offset = 420 // Offset to prevent scrolling under navbar
-    
-    storyBody.scrollTo({
-      top: Math.max(0, elementTop - offset),
-      behavior: 'smooth'
+    element.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
     })
+
+    const nextUrl = `${window.location.pathname}${window.location.search}#${encodeURIComponent(id)}`
+    window.history.pushState(null, '', nextUrl)
   }
+
+  useEffect(() => {
+    if (!article?.toc?.length || !window.location.hash) {
+      return undefined
+    }
+
+    const headingId = decodeURIComponent(window.location.hash.replace(/^#/, ''))
+    const timer = window.setTimeout(() => {
+      const element = document.getElementById(headingId)
+
+      if (element) {
+        element.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+      }
+    }, 120)
+
+    return () => window.clearTimeout(timer)
+  }, [article?.id, article?.toc])
 
   async function handleLoadMoreComments() {
     if (loadingMoreComments || !article) {
@@ -632,8 +658,8 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
           <span className="eyebrow">Article not found</span>
           <h1>This article could not be loaded.</h1>
           <p>{error || 'The article does not exist or has been removed.'}</p>
-          <a className="button button--primary" href="#/articles">
-            Browse published stories
+          <a className="button button--primary" href="/articles">
+            Browse published articles
           </a>
         </section>
 
@@ -660,8 +686,8 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
   }
 
   const authorName = getDisplayName(article.author)
-  const authorHeadline = getHeadline(article.author)
   const authorHandle = article.author?.profile?.handle
+  const articleTags = article.tags || []
   const articleIsPubliclyVisible = article.isPubliclyVisible ?? (
     article.publicationStatus === 'published'
   )
@@ -678,7 +704,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
     <div className="page-stack story-page">
       <section className="panel story-hero">
         <div className="story-hero__copy">
-          <a className="pill pill--soft pill--link" href={`#/domain/${article.domain}`}>
+          <a className="pill pill--soft pill--link" href={`/topic/${article.domain}`}>
             {article.domain.toUpperCase()}
           </a>
           {!articleIsPubliclyVisible ? (
@@ -691,19 +717,10 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
           ) : null}
 
           <div className="story-hero__meta">
-            <div className="author-inline">
-              <span className="author-inline__avatar">{getInitials(authorName)}</span>
-              <div>
-                <strong>{authorName}</strong>
-                <span>{authorHeadline}</span>
-              </div>
-            </div>
 
-            <div className="story-hero__details">
+            <div style={{marginLeft: "auto", "marginRight": "10px"}} className="story-hero__details">
               <span>{formatLongDate(article.publishedAt)}</span>
               <span>{article.readTime}</span>
-              <span>{article.likeCount} likes</span>
-              <span>{article.commentCount} comments</span>
             </div>
           </div>
 
@@ -715,7 +732,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
             ) : null}
 
             {canManageArticle ? (
-              <a className="button button--secondary" href={`#/article/${article.slug}/edit`}>
+              <a className="button button--secondary" href={`/article/${article.slug}/edit`}>
                 Edit article
               </a>
             ) : null}
@@ -746,115 +763,104 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       </section>
 
       <section className="story-layout">
-        <div className="panel story-content">
-          <div className="story-body">
-            {parsedBody !== null ? (
-              parsedBody
-            ) : (
-              <div dangerouslySetInnerHTML={{ __html: article.bodyHtml }} />
-            )}
-          </div>
-        </div>
+        <article className="story-body">
+          {parsedBody !== null ? (
+            parsedBody
+          ) : (
+            <div dangerouslySetInnerHTML={{ __html: article.bodyHtml }} />
+          )}
+        </article>
 
         <aside className="story-sidebar story-sidebar--right">
-          <div className="panel sidebar-card toc-panel">
-            <span className="eyebrow">Table of contents</span>
-            {article.toc.filter((entry) => entry.level === 2).length ? (
-              <div className="toc-list">
-                {article.toc.filter((entry) => entry.level === 2).map((entry) => (
-                  <button
-                    key={entry.id}
-                    className={`toc-link ${activeHeading === entry.id ? 'is-active' : ''}`}
-                    type="button"
-                    onClick={() => scrollToHeading(entry.id)}
-                  >
-                    <strong>{entry.text}</strong>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p>No headings were added to this article yet.</p>
-            )}
-          </div>
-          
-          {/* Vertical Ad Box */}
-          <a 
-            href="https://www.innomatics.in/" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="panel sidebar-card vertical-ad-box"
-          >
-            <span className="ad-label">Sponsored</span>
-            <div className="ad-content">
-              <div className="ad-icon">IRL</div>
-              <h4>Innomatics</h4>
-              <p>Data and AI programs</p>
-              <div className="ad-button">Learn more</div>
+          <div className="story-sidebar__sticky">
+            <div className="panel sidebar-card toc-panel">
+              <span className="eyebrow">Table of contents</span>
+              {article.toc.filter((entry) => entry.level === 2).length ? (
+                <div className="toc-list">
+                  {article.toc.filter((entry) => entry.level === 2).map((entry) => (
+                    <a
+                      key={entry.id}
+                      className={`toc-link ${activeHeading === entry.id ? 'is-active' : ''}`}
+                      href={`#${entry.id}`}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        scrollToHeading(entry.id)
+                      }}
+                    >
+                      <strong>{entry.text}</strong>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p>No headings were added to this article yet.</p>
+              )}
             </div>
-          </a>
+          
+            {/* Vertical Ad Box */}
+            <a 
+              href="https://www.innomatics.in/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="panel sidebar-card vertical-ad-box"
+            >
+              <span className="ad-label">Sponsored</span>
+              <div className="ad-content">
+                <div className="ad-icon">IRL</div>
+                <h4>Innomatics</h4>
+                <p>Data and AI programs</p>
+                <div className="ad-button">Learn more</div>
+              </div>
+            </a>
+          </div>
         </aside>
       </section>
 
       {/* Article interactions section below the content */}
-      <section className="article-interactions">
-        <div className="interactions-grid">
-          {/* Author card */}
-          <div className="panel interaction-card author-card-full">
-            <span className="eyebrow">Author</span>
-            <div className="author-profile">
-              <span className="author-card__avatar">{getInitials(authorName)}</span>
-              <div className="author-info">
-                <strong>{authorName}</strong>
-                <span>{authorHeadline}</span>
-                <p>{article.author.profile?.bio || 'This author has not added a bio yet.'}</p>
-                <p className="author-meta">
-                  {article.author.profile?.followersCount || 0} followers - Published on{' '}
-                  {formatShortDate(article.publishedAt)}
-                </p>
-                {authorHandle ? (
-                  <a className="button button--secondary button--small" href={`#/profile/${authorHandle}`}>
-                    View author profile
-                  </a>
-                ) : null}
-              </div>
-            </div>
-          </div>
-
-          {/* Engagement section */}
-          <div className="panel interaction-card engagement-card">
-            <span className="eyebrow">Engagement</span>
-            <div className="engagement-actions">
-              {articleIsPubliclyVisible ? (
-                <button className="button button--primary" type="button" onClick={handleLike}>
-                  {article.likedByMe ? 'Unlike article' : 'Like article'}
-                </button>
-              ) : null}
-
-              <ShareButton title={article.title} url={`#/article/${article.slug}`} />
-
-              {articleIsPubliclyVisible ? (
-                <div className="engagement-stats">
-                  <span>{article.likeCount} likes</span>
-                  <span>{article.commentCount} comments</span>
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          {/* Tags */}
-          <div className="panel interaction-card tags-card">
-            <span className="eyebrow">Tags</span>
-            <div className="article-card__tags">
-              {article.tags.length ? (
-                article.tags.map((tag) => (
-                  <span key={tag} className="tag">
-                    {tag}
-                  </span>
-                ))
+      <section className="panel article-afterword">
+        <div className="article-afterword__main">
+          <div>
+            <span className="eyebrow">After reading</span>
+            <p>
+              Written by{' '}
+              {authorHandle ? (
+                <a className="article-afterword__author" href={`/profile/${authorHandle}`}>
+                  {authorName}
+                </a>
               ) : (
-                <span className="tag">No tags added</span>
+                <strong>{authorName}</strong>
               )}
-            </div>
+              <span className="article-afterword__date">Published {formatShortDate(article.publishedAt)}</span>
+            </p>
+          </div>
+
+          <div className="article-afterword__actions">
+            {articleIsPubliclyVisible ? (
+              <button
+                className={`article-afterword__button article-like-button${article.likedByMe ? ' is-liked' : ''}`}
+                type="button"
+                onClick={handleLike}
+                aria-label={article.likedByMe ? 'Unlike article' : 'Like article'}
+              >
+                {article.likedByMe ? <FaHeart aria-hidden="true" /> : <FaRegHeart aria-hidden="true" />}
+                <span>{article.likedByMe ? 'Liked' : 'Like the article'}</span>
+              </button>
+            ) : null}
+
+            <ShareButton title={article.title} url={`/article/${article.slug}`} label="Share it" />
+          </div>
+        </div>
+
+        <div className="article-afterword__meta">
+          <div className="article-afterword__tags">
+            {articleTags.length ? (
+              articleTags.map((tag) => (
+                <span key={tag} className="tag">
+                  {tag}
+                </span>
+              ))
+            ) : (
+              <span className="tag">No tags added</span>
+            )}
           </div>
         </div>
       </section>
@@ -923,7 +929,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
                   ) : null}
                 </>
               ) : (
-                <p>Be the first reader to comment on this story.</p>
+                <p>Be the first reader to comment on this article.</p>
               )}
             </div>
           </div>

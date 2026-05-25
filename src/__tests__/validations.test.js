@@ -84,7 +84,7 @@ describe('frontend validation utilities', () => {
       'must not exceed 50 characters',
     )
     expect(validateTags(['Unknown', 'Object Detection', 'Model Deployment'], 'cv')).toContain(
-      'selected domain list',
+      'selected topic list',
     )
   })
 

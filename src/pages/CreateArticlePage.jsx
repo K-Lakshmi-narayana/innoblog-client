@@ -89,7 +89,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
     async function fetchTags() {
       setLoadingTags(true)
       try {
-        const data = await apiRequest(`/tags/suggestions?domain=${form.domain}`)
+        const data = await apiRequest(`/tags/suggestions?topic=${form.domain}`)
         setSuggestedTags(data.tags?.length ? data.tags : fallbackTags)
       } catch (err) {
         console.error('Failed to fetch tags:', err)
@@ -358,10 +358,10 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
           to the same profile.
         </p>
         <div className="hero__actions">
-          <a className="button button--primary" href="#/login">
+          <a className="button button--primary" href="/login">
             Sign in
           </a>
-          <a className="button button--secondary" href="#/articles">
+          <a className="button button--secondary" href="/articles">
             Explore articles
           </a>
         </div>
@@ -379,10 +379,10 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
           articles.
         </p>
         <div className="hero__actions">
-          <a className="button button--primary" href="#/profile/me">
+          <a className="button button--primary" href="/profile/me">
             Open your profile
           </a>
-          <a className="button button--secondary" href="#/articles">
+          <a className="button button--secondary" href="/articles">
             Keep reading
           </a>
         </div>
@@ -407,7 +407,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
         <span className="eyebrow">Could not open editor</span>
         <h1>{loadError}</h1>
         <p>The requested draft or article could not be loaded. Check the URL or return to the article list.</p>
-        <a className="button button--primary" href="#/articles">
+        <a className="button button--primary" href="/articles">
           Explore articles
         </a>
       </section>
@@ -451,7 +451,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
           </label>
 
           <label className="field">
-            <span>Domain</span>
+            <span>Topic</span>
             <select name="domain" value={form.domain} onChange={updateField}>
               {domains.map((domain) => (
                 <option key={domain.slug} value={domain.slug}>

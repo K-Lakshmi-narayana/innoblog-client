@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import { FaChevronDown } from 'react-icons/fa6'
+
 import { domains } from '../data/siteContent'
 
 function isActive(currentPath, href) {
@@ -8,10 +11,11 @@ function isActive(currentPath, href) {
 }
 
 export default function Sidebar({ currentPath, session }) {
+  const [topicsOpen, setTopicsOpen] = useState(false)
   const navItems = [
     { label: 'Home', href: '/' },
     { label: 'Articles', href: '/articles' },
-    { label: 'Top Articles', href: '/top' },
+    { label: 'Top Articles', href: '/top-articles' },
     ...(session?.user?.canWrite ? [{ label: 'Write', href: '/create' }] : []),
     ...(session?.user?.role === 'admin' ? [{ label: 'Admin', href: '/profile/me' }] : []),
   ]
@@ -27,7 +31,7 @@ export default function Sidebar({ currentPath, session }) {
               <a
                 key={item.href}
                 className={`sidebar-link ${isActive(currentPath, item.href) ? 'is-active' : ''}`}
-                href={`#${item.href}`}
+                href={item.href}
               >
                 {item.label}
               </a>
@@ -35,15 +39,27 @@ export default function Sidebar({ currentPath, session }) {
           </div>
         </nav>
 
-        {/* Domains Section */}
+        {/* Topics Section */}
         <div className="sidebar-domains">
-          <span className="sidebar-eyebrow">Topics</span>
-          <div className="domains-list">
+          <button
+            className={`sidebar-topics-toggle ${topicsOpen ? 'is-open' : ''}`}
+            type="button"
+            onClick={() => setTopicsOpen((open) => !open)}
+            aria-expanded={topicsOpen}
+            aria-controls="sidebar-topics-list"
+          >
+            <span className="sidebar-eyebrow">Topics</span>
+            <FaChevronDown className="sidebar-toggle-icon" aria-hidden="true" />
+          </button>
+          <div
+            id="sidebar-topics-list"
+            className={`domains-list ${topicsOpen ? 'is-open' : ''}`}
+          >
             {domains.map((domain) => (
               <a
                 key={domain.slug}
-                className={`domain-link ${isActive(currentPath, `/domain/${domain.slug}`) ? 'is-active' : ''}`}
-                href={`#/domain/${domain.slug}`}
+                className={`domain-link ${isActive(currentPath, `/topic/${domain.slug}`) ? 'is-active' : ''}`}
+                href={`/topic/${domain.slug}`}
               >
                 <span className="domain-icon">{domain.label}</span>
                 <span className="domain-name">{domain.name}</span>
@@ -58,7 +74,7 @@ export default function Sidebar({ currentPath, session }) {
             <span className="sidebar-eyebrow">Account</span>
             <a
               className="sidebar-link"
-              href="#/profile/me"
+              href="/profile/me"
             >
             My profile
             </a>

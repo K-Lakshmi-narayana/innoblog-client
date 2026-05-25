@@ -2,7 +2,7 @@ import ArticleCard from '../components/ArticleCard'
 import SectionHeading from '../components/SectionHeading'
 
 export default function TopArticlesPage({ articles }) {
-  const leadStory = articles[0]
+  const leadArticle = articles[0]
   const leaderboard = articles.slice(1, 6)
 
   return (
@@ -15,14 +15,14 @@ export default function TopArticlesPage({ articles }) {
             Ranked by community engagement and readership, discover the articles making the biggest impact in our community.
           </p>
         </div>
-        <a className="button button--primary" href="#/articles">
-          Browse all stories
+        <a className="button button--primary" href="/articles">
+          Browse all articles
         </a>
       </section>
 
       <section className="leaderboard-layout">
-        {leadStory ? (
-          <ArticleCard article={leadStory} variant="feature" />
+        {leadArticle ? (
+          <ArticleCard article={leadArticle} variant="feature" />
         ) : (
           <div className="panel empty-panel">
             <strong>No popular articles yet.</strong>
@@ -39,7 +39,7 @@ export default function TopArticlesPage({ articles }) {
 
           {leaderboard.length ? (
             leaderboard.map((article, index) => (
-              <a key={article.id} className="leaderboard-item" href={`#/article/${article.slug}`}>
+              <a key={article.id} className="leaderboard-item" href={`/article/${article.slug}`}>
                 <span className="leaderboard-item__rank">
                   {String(index + 2).padStart(2, '0')}
                 </span>

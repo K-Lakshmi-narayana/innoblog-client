@@ -34,7 +34,7 @@ export default function AppHeader({ currentPath, session, onLogout }) {
   const navItems = [
     { label: 'Home', href: '/' },
     { label: 'Articles', href: '/articles' },
-    { label: 'Top Articles', href: '/top' },
+    { label: 'Top Articles', href: '/top-articles' },
     ...(session?.user?.canWrite ? [{ label: 'Write', href: '/create' }] : []),
     ...(session ? [{ label: 'Profile', href: '/profile/me' }] : []),
   ]
@@ -44,7 +44,7 @@ export default function AppHeader({ currentPath, session, onLogout }) {
       <header className="app-header">
         <div className="app-header__bar">
           <div className='mobile-logo'>
-          <a className="brand" href="#/">
+          <a className="brand" href="/">
             <img width={55} height={55} src={isDarkMode ? logoDark : logo} alt="logo" />
             <span className="brand__wordmark">
               <strong>I N N O B L O G</strong>
@@ -59,7 +59,7 @@ export default function AppHeader({ currentPath, session, onLogout }) {
               <a
                 key={item.href}
                 className={`app-nav__link ${isActive(currentPath, item.href) ? 'is-active' : ''}`}
-                href={`#${item.href}`}
+                href={item.href}
               >
                 {item.label}
               </a>
@@ -71,7 +71,7 @@ export default function AppHeader({ currentPath, session, onLogout }) {
 
             {session ? (
               <>
-                <a className="profile-chip" href="#/profile/me">
+                <a className="profile-chip" href="/profile/me">
                   <span className="profile-chip__avatar">
                     {getInitials(getDisplayName(session.user))}
                   </span>
@@ -85,7 +85,7 @@ export default function AppHeader({ currentPath, session, onLogout }) {
                 </button>
               </>
             ) : (
-              <a className="button button--secondary login-btn" href="#/login">
+              <a className="button button--secondary login-btn" href="/login">
                 Login
               </a>
             )}
@@ -96,7 +96,7 @@ export default function AppHeader({ currentPath, session, onLogout }) {
       {/* Topics strip - shows on mobile, sidebar shows on desktop */}
       <div className="topic-strip" aria-label="Topics">
         {domains.map((domain) => (
-          <a key={domain.slug} className="topic-pill" href={`#/domain/${domain.slug}`}>
+          <a key={domain.slug} className="topic-pill" href={`/topic/${domain.slug}`}>
             {domain.label}
             <span>{domain.name}</span>
           </a>

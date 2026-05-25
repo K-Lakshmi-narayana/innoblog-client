@@ -7,7 +7,7 @@ export default function SiteFooter({ domains }) {
     <footer className="site-footer">
       <div className="site-footer__grid">
         <div>
-          <a className="brand brand--footer" href="#/">
+          <a className="brand brand--footer" href="/">
             <img width={44} height={48} src={logo} alt="logo" />
             <span className="brand__wordmark">
               <strong>I N N O B L O G</strong>
@@ -22,22 +22,13 @@ export default function SiteFooter({ domains }) {
         <div>
           <h3>Navigate</h3>
           <div className="footer-links">
-            <a href="#/">Home</a>
-            <a href="#/articles">Browse Articles</a>
-            <a href="#/top">Popular Articles</a>
-            <a href="#/create">Submit Article</a>
+            <a href="/">Home</a>
+            <a href="/articles">Browse Articles</a>
+            <a href="/top-articles">Popular Articles</a>
           </div>
         </div>
 
         <div>
-          <h3>Domains</h3>
-          <div className="footer-links footer-links--pills">
-            {domains.map((domain) => (
-              <a key={domain.slug} href={`#/domain/${domain.slug}`}>
-                {domain.label}
-              </a>
-            ))}
-          </div>
           <div className="f-con-1">
             <p className="f-ad">Contact: <a className="td-none" href="mailto:info@innomatics.in">info@innomatics.in</a></p>
             <br />

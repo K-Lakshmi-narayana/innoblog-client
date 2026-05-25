@@ -1,19 +1,21 @@
-export default function ShareButton({ title, url }) {
+import { FaShareNodes } from 'react-icons/fa6'
+
+export default function ShareButton({ title, url, label = '' }) {
   function shareArticle() {
     const text = `Check out this article: ${title}`
+    const shareUrl = new URL(url, window.location.origin).href
     
     // Try native share API first
     if (navigator.share) {
       navigator.share({
         title: title,
-        url: url,
+        url: shareUrl,
         text: text,
       }).catch(() => {
         // User cancelled share
       })
     } else {
       // Fallback: Copy to clipboard
-      const shareUrl = `${window.location.origin}${url}`
       navigator.clipboard.writeText(shareUrl).then(() => {
         alert('Article link copied to clipboard!')
       })
@@ -22,11 +24,14 @@ export default function ShareButton({ title, url }) {
 
   return (
     <button
-      className="button button--secondary"
+      className="article-afterword__button article-share-button"
       type="button"
       onClick={shareArticle}
+      aria-label="Share article"
+      title="Share article"
     >
-      Share article
+      <FaShareNodes aria-hidden="true" />
+      {label ? <span>{label}</span> : null}
     </button>
   )
 }

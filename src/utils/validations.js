@@ -286,7 +286,7 @@ export function validateTags(tags, domain = '') {
 
   const unknownTags = getUnknownTags(tagArray, domain)
   if (unknownTags.length > 0) {
-    return `Choose tags from the selected domain list. Remove: ${unknownTags.join(', ')}.`
+    return `Choose tags from the selected topic list. Remove: ${unknownTags.join(', ')}.`
   }
 
   return null

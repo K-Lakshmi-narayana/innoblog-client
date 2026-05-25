@@ -1,5 +1,18 @@
 const API_BASE =
-  import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
+  import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'
+
+function buildApiUrl(path) {
+  const rawPath = String(path || '')
+
+  if (/^https?:\/\//i.test(rawPath)) {
+    return rawPath
+  }
+
+  const base = API_BASE.replace(/\/+$/, '')
+  const requestPath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`
+
+  return `${base}${requestPath}`
+}
 
 function buildRequestError(response, data = {}) {
   const errorPayload = data.error || {}
@@ -20,7 +33,7 @@ export async function apiRequest(path, options = {}) {
   const timeoutId = setTimeout(() => controller.abort(), timeout)
 
   try {
-    const response = await fetch(`${API_BASE}${path}`, {
+    const response = await fetch(buildApiUrl(path), {
       method,
       credentials: 'include',
       signal: controller.signal,

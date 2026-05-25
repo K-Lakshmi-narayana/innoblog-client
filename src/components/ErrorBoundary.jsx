@@ -39,7 +39,7 @@ export default class ErrorBoundary extends Component {
       const description =
         this.props.description ||
         'Refresh the page or head back to a stable screen and try again.'
-      const actionHref = this.props.actionHref || '#/'
+      const actionHref = this.props.actionHref || '/'
       const actionLabel = this.props.actionLabel || 'Return home'
 
       return (
