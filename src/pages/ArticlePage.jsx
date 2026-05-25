@@ -819,7 +819,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       <section className="panel article-afterword">
         <div className="article-afterword__main">
           <div>
-            <span className="eyebrow">After reading</span>
+            <span className="eyebrow">Author Details</span>
             <p>
               Written by{' '}
               {authorHandle ? (

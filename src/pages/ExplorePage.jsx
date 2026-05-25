@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FaMagnifyingGlass } from 'react-icons/fa6'
+import { FaMagnifyingGlass,FaArrowLeft, FaArrowRight } from 'react-icons/fa6'
 
 import { apiRequest } from '../api'
 import ArticleCard from '../components/ArticleCard'
@@ -76,7 +76,7 @@ export default function ExplorePage({ domains }) {
     }
   }, [page, sort, submittedQuery])
 
-  const pageNumbers = Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+  const pageNumbers = Array.from({ length: Math.min(4, totalPages) }, (_, i) => {
     const start = Math.max(1, page - 2)
     return start + i
   }).filter((p) => p <= totalPages)
@@ -127,7 +127,7 @@ export default function ExplorePage({ domains }) {
           description="Use search and filters to navigate through our collection of curated articles."
         />
 
-        <form className="catalog-toolbar panel catalog-toolbar--wide" onSubmit={handleSearchSubmit}>
+        <form className="catalog-toolbar panel catalog-toolbar--wide catalog-container" onSubmit={handleSearchSubmit}>
           <div className="catalog-search">
             <label className="field">
               <span>Search the feed</span>
@@ -138,9 +138,8 @@ export default function ExplorePage({ domains }) {
                 onChange={(event) => setQuery(event.target.value)}
               />
             </label>
-            <button className="button button--primary catalog-search__button" type="submit" disabled={loading}>
+            <button style={{marginBottom: "5px"}} className="button button--primary catalog-search__button" type="submit" disabled={loading}>
               <FaMagnifyingGlass aria-hidden="true" />
-              <span>Search</span>
             </button>
           </div>
 
@@ -191,12 +190,13 @@ export default function ExplorePage({ domains }) {
 
         <div className="pagination-controls">
           <button
+            style={{padding: "10px", width: "50px"}}
             className="button button--ghost"
             type="button"
             onClick={handlePreviousPage}
             disabled={page <= 1 || loading}
           >
-            Previous
+            <FaArrowLeft/>
           </button>
 
           {pageNumbers.map((pageNumber) => (
@@ -212,12 +212,13 @@ export default function ExplorePage({ domains }) {
           ))}
 
           <button
+            style={{padding: "10px", width: "50px"}}
             className="button button--ghost"
             type="button"
             onClick={handleNextPage}
             disabled={page >= totalPages || loading}
           >
-            Next
+            <FaArrowRight/>
           </button>
         </div>
       </section>

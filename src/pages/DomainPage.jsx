@@ -4,6 +4,7 @@ import ArticleCard from '../components/ArticleCard'
 import SectionHeading from '../components/SectionHeading'
 import LoadingDots from '../components/LoadingDots'
 import { getUserFriendlyError } from '../utils/errorMessages'
+import { FaArrowLeft, FaArrowRight } from 'react-icons/fa6'
 
 export default function DomainPage({ domain }) {
   const [articles, setArticles] = useState([])
@@ -60,7 +61,7 @@ export default function DomainPage({ domain }) {
     setPage((current) => Math.min(totalPages, current + 1))
   }
 
-  const pageNumbers = Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+  const pageNumbers = Array.from({ length: Math.min(4, totalPages) }, (_, i) => {
     const start = Math.max(1, page - 2)
     return start + i
   }).filter((p) => p <= totalPages)
@@ -140,12 +141,13 @@ export default function DomainPage({ domain }) {
 
           <div className="pagination-controls">
             <button
+              style={{padding: "10px", width: "50px"}}
               className="button button--ghost"
               type="button"
               onClick={handlePreviousPage}
               disabled={page <= 1 || loading}
             >
-              Previous
+              <FaArrowLeft />
             </button>
 
             {pageNumbers.map((pageNumber) => (
@@ -161,12 +163,13 @@ export default function DomainPage({ domain }) {
             ))}
 
             <button
+              style={{padding: "10px", width: "50px"}}
               className="button button--ghost"
               type="button"
               onClick={handleNextPage}
               disabled={page >= totalPages || loading}
             >
-              Next
+              <FaArrowRight />
             </button>
           </div>
         </>

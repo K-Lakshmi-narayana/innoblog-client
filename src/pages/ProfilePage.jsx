@@ -6,6 +6,7 @@ import LoadingDots from '../components/LoadingDots'
 import { navigateTo } from '../hooks/useHashRoute'
 import { getUserFriendlyError } from '../utils/errorMessages'
 import { getDisplayName, getHeadline, getInitials, withProtocol } from '../utils/articleUtils'
+import { FaArrowLeft, FaArrowRight } from 'react-icons/fa6'
 
 const ARTICLE_SORT_OPTIONS = [
   { value: 'recent', label: 'Newest' },
@@ -459,7 +460,7 @@ export default function ProfilePage({
   }
 
   const totalPages = Math.ceil(profileState.totalArticles / limit)
-  const pageNumbers = Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+  const pageNumbers = Array.from({ length: Math.min(4, totalPages) }, (_, i) => {
     const start = Math.max(1, page - 2)
     return start + i
   }).filter((p) => p <= totalPages)
@@ -669,12 +670,11 @@ export default function ProfilePage({
                     .filter((author) => author.canWrite)
                     .map((author) => (
                       <div key={author.id} className="writer-list__item">
-                        <div>
-                          <strong>{author.profile?.displayName || author.email}</strong>
+                        <div style={{display: "flex", flexDirection: "column"}}>
+                          <strong>{author.profile?.displayName || author.email} - {author.role} </strong>
                           <span>{author.email}</span>
                         </div>
                         <div className="writer-list__role">
-                          <span>{author.role}</span>
                           {author.role !== 'admin' && author.canWrite ? (
                             <button
                               type="button"
@@ -697,19 +697,19 @@ export default function ProfilePage({
                 ) : adminMetrics ? (
                   <div className="admin-metrics">
                     <div className="admin-metrics__item">
-                      <strong>{adminMetrics.activeReaderLogins}</strong>
+                      <strong>{adminMetrics.activeReaderLogins} - </strong>
                       <span>Readers logged in last 24 hours</span>
                     </div>
                     <div className="admin-metrics__item">
-                      <strong>{adminMetrics.totalReaders}</strong>
+                      <strong>{adminMetrics.totalReaders} - </strong>
                       <span>Total reader accounts</span>
                     </div>
                     <div className="admin-metrics__item">
-                      <strong>{adminMetrics.publishedLast24Hours}</strong>
+                      <strong>{adminMetrics.publishedLast24Hours} - </strong>
                       <span>Articles published last 24 hours</span>
                     </div>
                     <div className="admin-metrics__item">
-                      <strong>{adminMetrics.totalPublishedArticles}</strong>
+                      <strong>{adminMetrics.totalPublishedArticles} - </strong>
                       <span>Published articles</span>
                     </div>
                   </div>
@@ -808,12 +808,13 @@ export default function ProfilePage({
           {profileState.totalArticles >= 10 && (
             <div className="pagination-controls">
               <button
+                style={{padding: "10px", width: "50px"}}
                 className="button button--ghost"
                 type="button"
                 onClick={handlePreviousPage}
                 disabled={page <= 1 || profileState.loading || publicationsLoading}
               >
-                Previous
+                <FaArrowLeft />
               </button>
 
               {pageNumbers.map((pageNumber) => (
@@ -829,12 +830,13 @@ export default function ProfilePage({
               ))}
 
               <button
+                style={{padding: "10px", width: "50px"}}
                 className="button button--ghost"
                 type="button"
                 onClick={handleNextPage}
                 disabled={page >= totalPages || profileState.loading || publicationsLoading}
               >
-                Next
+                <FaArrowRight />
               </button>
             </div>
           )}

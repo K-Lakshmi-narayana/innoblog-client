@@ -742,6 +742,7 @@ export default function Editor({ value, onChange, onError }) {
           onClick={handleLinkClick}
         />
         <ToolbarButton
+          style={{padding: "20px"}}
           icon={<FaPalette />}
           label="Color"
           colorIndicator={selectedColor}

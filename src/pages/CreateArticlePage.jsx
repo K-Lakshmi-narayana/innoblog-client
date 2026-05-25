@@ -459,6 +459,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
                 </option>
               ))}
             </select>
+            <div>&#8203;</div>
           </label>
 
           <label className="field">
