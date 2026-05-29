@@ -4,7 +4,6 @@ import ArticleCard from '../components/ArticleCard'
 import LoadingDots from '../components/LoadingDots'
 import SectionHeading from '../components/SectionHeading'
 import { getUserFriendlyError } from '../utils/errorMessages'
-import { getDisplayName } from '../utils/articleUtils'
 
 function getUniqueArticles(...articleLists) {
   const seenArticles = new Set()
@@ -161,7 +160,7 @@ export default function LandingPage({
           <span className="eyebrow">Discover quality articles</span>
           <h1>The future belongs to people who understand AI. Master AI by learning one article at a time.</h1>
           <p>
-            Explore a curated collection of articles written by experts in their fields. Discover new perspectives, learn from industry leaders, and engage with a thriving community of knowledge seekers. Read, share, and contribute your own insights.
+            &nbsp;&nbsp;Explore a curated hub of cutting-edge articles, expert insights, and practical tutorials covering Artificial Intelligence, Machine Learning, Deep Learning, Computer Vision, Neural Networks, Generative AI, Data Science, and emerging technologies shaping the future. Learn from industry leaders as they simplify complex ideas, share real-world applications, and uncover the latest breakthroughs, tools, and trends. <br /> &nbsp;&nbsp; Whether you're a beginner, developer, researcher, or tech enthusiast, discover fresh perspectives, expand your knowledge, share your ideas, and become part of a thriving community passionate about innovation and the future of technology.
           </p>
 
           <div className="hero__actions">
@@ -208,18 +207,9 @@ export default function LandingPage({
                 style={{ transform: `translateX(-${featuredIndex * 100}%)` }}
               >
                 {featuredArticles.map((article) => (
-                  <a
-                    key={article.id || article.slug}
-                    className="featured-carousel__slide"
-                    href={`/article/${article.slug}`}
-                  >
-                    <h2>{article.title}</h2>
-                    <p>{article.summary}</p>
-                    <div className="spotlight-card__footer">
-                      <span>by {getDisplayName(article.author)} - </span>
-                      <span>{article.readTime}</span>
-                    </div>
-                  </a>
+                  <div key={article.id || article.slug} className="featured-carousel__slide">
+                    <ArticleCard article={article} variant="featured" />
+                  </div>
                 ))}
               </div>
             </div>

@@ -28,10 +28,20 @@ describe('frontend validation utilities', () => {
   })
 
   it('validates article body based on plain text length', () => {
-    expect(validateBody(`<p>${'A'.repeat(150)}</p>`)).toBeNull()
+    expect(validateBody(`<p>${'Readable article content '.repeat(8)}</p>`)).toBeNull()
     expect(validateBody('<p>short</p>')).toContain('at least 120 characters')
     expect(validateBody(`<p>${'A'.repeat(60001)}</p>`)).toContain(
       'must not exceed 60,000 characters',
+    )
+  })
+
+  it('rejects article fields with excessive unbroken text runs', () => {
+    const longToken = 'a'.repeat(81)
+
+    expect(validateTitle(`Valid ${longToken}`)).toContain('unbroken text run')
+    expect(validateSummary(`Readable summary ${longToken}`)).toContain('unbroken text run')
+    expect(validateBody(`<p>${'Readable words '.repeat(10)} ${longToken}</p>`)).toContain(
+      'unbroken text run',
     )
   })
 

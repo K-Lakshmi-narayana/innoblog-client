@@ -6,7 +6,7 @@ import LoadingDots from '../components/LoadingDots'
 import { navigateTo } from '../hooks/useHashRoute'
 import { getUserFriendlyError } from '../utils/errorMessages'
 import { getDisplayName, getHeadline, getInitials, withProtocol } from '../utils/articleUtils'
-import { FaArrowLeft, FaArrowRight } from 'react-icons/fa6'
+import { FaArrowLeft, FaArrowRight, FaMagnifyingGlass } from 'react-icons/fa6'
 
 const ARTICLE_SORT_OPTIONS = [
   { value: 'recent', label: 'Newest' },
@@ -74,6 +74,7 @@ export default function ProfilePage({
   const [publicationRequests, setPublicationRequests] = useState([])
   const [publicationRequestsLoading, setPublicationRequestsLoading] = useState(false)
   const [publicationRequestsError, setPublicationRequestsError] = useState('')
+  const [reviewSearch, setReviewSearch] = useState('')
   const [publications, setPublications] = useState([])
   const [publicationsLoading, setPublicationsLoading] = useState(false)
   const [publicationsError, setPublicationsError] = useState('')
@@ -503,6 +504,20 @@ export default function ProfilePage({
     ? 'Your publications'
     : `${displayName}'s published articles`
   const publicationEyebrow = viewingSelf && canWrite ? 'Publications' : 'Published articles'
+  const reviewSearchTerm = reviewSearch.trim().toLowerCase()
+  const filteredPublicationRequests = reviewSearchTerm
+    ? publicationRequests.filter((request) => {
+        const searchableText = [
+          request.draft?.title,
+          request.draft?.summary,
+          request.draft?.domain,
+          request.author?.email,
+          request.author?.profile?.displayName,
+        ].filter(Boolean).join(' ').toLowerCase()
+
+        return searchableText.includes(reviewSearchTerm)
+      })
+    : publicationRequests
 
   return (
     <div className="page-stack">
@@ -962,6 +977,21 @@ export default function ProfilePage({
             </div>
           </div>
 
+          <form className="review-search" role="search" onSubmit={(event) => event.preventDefault()}>
+            <label className="field">
+              <span>Search review queue</span>
+              <div className="review-search__input">
+                <FaMagnifyingGlass aria-hidden="true" />
+                <input
+                  type="search"
+                  value={reviewSearch}
+                  placeholder="Search by title, topic, or author"
+                  onChange={(event) => setReviewSearch(event.target.value)}
+                />
+              </div>
+            </label>
+          </form>
+
           {publicationRequestsLoading ? (
             <LoadingDots />
           ) : publicationRequestsError ? (
@@ -969,12 +999,15 @@ export default function ProfilePage({
               <strong>Could not load publication requests.</strong>
               <p>{publicationRequestsError}</p>
             </div>
-          ) : publicationRequests.length ? (
+          ) : filteredPublicationRequests.length ? (
             <div className="publication-requests">
-              {publicationRequests.map((request) => (
+              {filteredPublicationRequests.map((request) => (
                 <div key={request.id} className="panel publication-request-card">
                   <div className="request-header">
-                    <h3>{request.draft.title}</h3>
+                    <div>
+                      <span className="eyebrow">Review to publish</span>
+                      <h3>{request.draft.title}</h3>
+                    </div>
                     <span className="request-date">
                       Requested: {new Date(request.requestedAt).toLocaleDateString()}
                     </span>
@@ -1018,7 +1051,7 @@ export default function ProfilePage({
             </div>
           ) : (
             <div className="panel empty-panel">
-              <strong>No pending publication requests.</strong>
+              <strong>{reviewSearchTerm ? 'No review requests match your search.' : 'No pending publication requests.'}</strong>
             </div>
           )}
         </section>

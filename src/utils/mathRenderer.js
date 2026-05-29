@@ -30,7 +30,7 @@ export function renderMathInHtml(htmlString) {
   // Then process inline math ($...$) - careful not to match $$ boundaries
   // This regex finds $ followed by content (not containing $) followed by $
   // and uses negative lookbehind/lookahead to avoid $$ patterns
-  html = html.replace(/(?<!\$)\$([^\$\n]+?)\$(?!\$)/g, (match, latex) => {
+  html = html.replace(/(?<!\$)\$([^$\n]+?)\$(?!\$)/g, (match, latex) => {
     const trimmedLatex = latex.trim()
 
     // Skip if empty or just whitespace or single character
@@ -65,4 +65,3 @@ function escapeHtml(unsafe) {
 }
 
 export default renderMathInHtml
-

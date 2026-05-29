@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { FaExpand, FaCompress } from 'react-icons/fa'
 
 import { apiRequest } from '../api'
 import Editor from '../components/Editor'
@@ -424,8 +425,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
             <p>Draft the article, add discovery details, and submit it for publication.</p>
           </div>
           <div className="draft-status">
-            <span className="draft-status__icon">{draftStatus === 'autosaving' ? 'Saving' : 'Saved'}</span>
-            <span>{draftStatusLabel}</span>
+            <span className="draft-status__icon">{draftStatusLabel}</span>
           </div>
         </div>
 
@@ -579,9 +579,10 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
             <button
               type="button"
               className="button button--ghost"
+              title={editorFullscreen ? 'Exit full screen' : 'Expand to full screen'}
               onClick={() => setEditorFullscreen((value) => !value)}
             >
-            {editorFullscreen ? 'Exit full screen' : 'Expand editor'}
+              {editorFullscreen ? <FaCompress /> : <FaExpand />}
             </button>
           </div>
 

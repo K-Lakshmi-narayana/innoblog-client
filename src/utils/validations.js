@@ -16,6 +16,7 @@ export const FIELD_LIMITS = {
   coverLabel: { min: 0, max: 100 },
   body: { min: 120, max: 60000 },
   bodyHtml: { max: 150000 },
+  unbrokenText: { max: 80 },
   
   // Tags
   tag: { max: MAX_ARTICLE_TAG_LENGTH },
@@ -48,6 +49,26 @@ export function formatFileSize(bytes) {
 
 function formatNumber(value) {
   return Number(value).toLocaleString('en-US')
+}
+
+function stripHtml(value = '') {
+  return String(value || '').replace(/<[^>]*>/g, ' ')
+}
+
+function getLongUnbrokenTextRun(value = '') {
+  return stripHtml(value)
+    .split(/\s+/)
+    .find((part) => part.length > FIELD_LIMITS.unbrokenText.max)
+}
+
+function validateUnbrokenTextRun(value, label) {
+  const longRun = getLongUnbrokenTextRun(value)
+
+  if (!longRun) {
+    return null
+  }
+
+  return `${label} contains a word or unbroken text run over ${FIELD_LIMITS.unbrokenText.max} characters. Add spaces or punctuation so it can wrap cleanly.`
 }
 
 function getDataUrlImageInfo(dataUrl = '') {
@@ -216,6 +237,10 @@ export function validateTitle(title) {
   if (title.length > FIELD_LIMITS.title.max) {
     return `Title must not exceed ${FIELD_LIMITS.title.max} characters.`
   }
+  const unbrokenTextError = validateUnbrokenTextRun(title, 'Title')
+  if (unbrokenTextError) {
+    return unbrokenTextError
+  }
   return null
 }
 
@@ -229,6 +254,10 @@ export function validateSummary(summary) {
   if (summary.length > FIELD_LIMITS.summary.max) {
     return `Summary must not exceed ${FIELD_LIMITS.summary.max} characters.`
   }
+  const unbrokenTextError = validateUnbrokenTextRun(summary, 'Summary')
+  if (unbrokenTextError) {
+    return unbrokenTextError
+  }
   return null
 }
 
@@ -236,13 +265,15 @@ export function validateCoverLabel(coverLabel) {
   if (coverLabel && coverLabel.length > FIELD_LIMITS.coverLabel.max) {
     return `Cover label must not exceed ${FIELD_LIMITS.coverLabel.max} characters.`
   }
+  const unbrokenTextError = validateUnbrokenTextRun(coverLabel, 'Cover label')
+  if (unbrokenTextError) {
+    return unbrokenTextError
+  }
   return null
 }
 
 export function validateBody(body) {
-  const plainText = body
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
-    .trim()
+  const plainText = stripHtml(body).trim()
   
   if (!plainText || plainText.length < FIELD_LIMITS.body.min) {
     return `Article body must have at least ${FIELD_LIMITS.body.min} characters.`
@@ -253,6 +284,10 @@ export function validateBody(body) {
   const payloadError = validateArticlePayloadSize(body)
   if (payloadError) {
     return payloadError
+  }
+  const unbrokenTextError = validateUnbrokenTextRun(plainText, 'Article body')
+  if (unbrokenTextError) {
+    return unbrokenTextError
   }
   return null
 }

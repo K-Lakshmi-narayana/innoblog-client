@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   EditorContent,
   NodeViewWrapper,
@@ -6,6 +6,7 @@ import {
   ReactNodeViewRenderer,
   useEditor,
 } from '@tiptap/react'
+import { Extension } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import CodeBlock from '@tiptap/extension-code-block'
 import Link from '@tiptap/extension-link'
@@ -16,8 +17,9 @@ import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
 import { TextStyle } from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
+import TextAlign from '@tiptap/extension-text-align'
 import Blockquote from '@tiptap/extension-blockquote'
-import MonacoEditor from '@monaco-editor/react'
+import DeferredMonacoEditor from './DeferredMonacoEditor'
 import { Math as MathExtension } from '../extensions/Math'
 import {
   FaBold,
@@ -37,6 +39,9 @@ import {
   FaCompress,
   FaExpand,
   FaSquareRootAlt,
+  FaAlignLeft,
+  FaAlignCenter,
+  FaAlignRight,
 } from 'react-icons/fa'
 import {
   ARTICLE_IMAGE_LIMITS,
@@ -346,7 +351,7 @@ function MonacoCodeBlock({ node, updateAttributes, editor, getPos }) {
             <option value="markdown">Markdown</option>
           </select>
         </div>
-        <MonacoEditor
+        <DeferredMonacoEditor
           height={height}
           language={language}
           value={value}
@@ -481,6 +486,48 @@ const ColoredBlockquote = Blockquote.extend({
   },
 })
 
+const FontSize = Extension.create({
+  name: 'fontSize',
+
+  addOptions() {
+    return {
+      types: ['textStyle'],
+    }
+  },
+
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: (element) => element.style.fontSize || null,
+            renderHTML: (attributes) => {
+              if (!attributes.fontSize) {
+                return {}
+              }
+
+              return {
+                style: `font-size: ${attributes.fontSize}`,
+              }
+            },
+          },
+        },
+      },
+    ]
+  },
+
+  addCommands() {
+    return {
+      setFontSize:
+        (fontSize) =>
+        ({ chain }) =>
+          chain().setMark('textStyle', { fontSize }).run(),
+    }
+  },
+})
+
 export default function Editor({ value, onChange, onError }) {
   const [selectedColor, setSelectedColor] = useState('#c53030')
   const [selectedTableColor, setSelectedTableColor] = useState('#c53030')
@@ -489,59 +536,101 @@ export default function Editor({ value, onChange, onError }) {
   const [tableColorPickerOpen, setTableColorPickerOpen] = useState(false)
   const fileInputRef = useRef(null)
   const colorOptions = ['#c53030', '#db7093', '#7c3aed', '#2563eb', '#16a34a', '#d97706', '#000000']
+  const [initialContent] = useState(() => (typeof value === 'string' && value.trim() ? value : '<p></p>'))
+  const lastSyncedHtmlRef = useRef(initialContent)
+  const editorProps = useMemo(() => ({
+    attributes: {
+      class: 'editor-prose',
+    },
+  }), [])
+  const editorExtensions = useMemo(() => [
+    StarterKit.configure({
+      codeBlock: false,
+      blockquote: false,
+      link: false,
+    }),
+    MonacoCodeBlockExtension,
+    ColoredBlockquote,
+    MathExtension,
+    TextStyle.configure({
+      types: ['textStyle'],
+    }),
+    FontSize,
+    Color.configure({
+      types: ['textStyle'],
+    }),
+    TextAlign.configure({
+      types: ['heading', 'paragraph'],
+      alignments: ['left', 'center', 'right'],
+      defaultAlignment: 'left',
+    }),
+    Link.configure({
+      autolink: true,
+      openOnClick: false,
+      defaultProtocol: 'https',
+    }),
+    ResizableImage.configure({
+      allowBase64: true,
+    }),
+    ColoredTable.configure({
+      resizable: true,
+    }),
+    TableRow,
+    TableHeader,
+    TableCell.configure({
+      allowColspan: true,
+      allowRowspan: true,
+    }),
+  ], [])
 
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        codeBlock: false,
-        blockquote: false,
-        link: false,
-      }),
-      MonacoCodeBlockExtension,
-      ColoredBlockquote,
-      MathExtension,
-      TextStyle.configure({
-        types: ['textStyle'],
-      }),
-      Color.configure({
-        types: ['textStyle'],
-      }),
-      Link.configure({
-        autolink: true,
-        openOnClick: false,
-        defaultProtocol: 'https',
-      }),
-      ResizableImage.configure({
-        allowBase64: true,
-      }),
-      ColoredTable.configure({
-        resizable: true,
-      }),
-      TableRow,
-      TableHeader,
-      TableCell.configure({
-        allowColspan: true,
-        allowRowspan: true,
-      }),
-    ],
-    editorProps: {
-      attributes: {
-        class: 'editor-prose',
-      },
+    extensions: editorExtensions,
+    immediatelyRender: false,
+    editorProps,
+    content: initialContent,
+    onContentError: ({ error }) => {
+      onError?.(error?.message || 'The saved draft content could not be opened in the editor.')
     },
-    content: value,
     onUpdate: ({ editor: currentEditor }) => {
-      onChange?.(currentEditor.getHTML())
+      if (!currentEditor?.isDestroyed && currentEditor.schema) {
+        try {
+          const nextHtml = currentEditor.getHTML()
+          lastSyncedHtmlRef.current = nextHtml
+          onChange?.(nextHtml)
+        } catch {
+          // Ignore transient reads while React remounts the editor in development Strict Mode.
+        }
+      }
     },
   })
 
   useEffect(() => {
-    if (!editor || typeof value !== 'string' || value === editor.getHTML()) {
+    if (
+      !editor ||
+      editor.isDestroyed ||
+      !editor.schema ||
+      typeof value !== 'string' ||
+      value === lastSyncedHtmlRef.current
+    ) {
       return
     }
 
-    editor.commands.setContent(value, false)
-  }, [editor, value])
+    const nextContent = value || '<p></p>'
+    const timeoutId = window.setTimeout(() => {
+      if (!editor || editor.isDestroyed || !editor.schema) {
+        return
+      }
+
+      try {
+        editor.commands.setContent(nextContent, false)
+        lastSyncedHtmlRef.current = nextContent
+      } catch (contentError) {
+        onError?.(contentError?.message || 'The saved draft content could not be opened in the editor.')
+      }
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [editor, onError, value])
 
   if (!editor) {
     return null
@@ -597,6 +686,10 @@ export default function Editor({ value, onChange, onError }) {
   }
 
   function handleQuoteColorClick() {
+    // Ensure we're in a blockquote before opening the color picker
+    if (!editor.isActive('blockquote')) {
+      editor.chain().focus().toggleBlockquote().run()
+    }
     setQuoteColorPickerOpen((current) => !current)
   }
 
@@ -618,17 +711,11 @@ export default function Editor({ value, onChange, onError }) {
 
   function handleSetQuoteColor(color) {
     const lightColor = lightenColor(color, 65) // Lighten by 65%
-    // First ensure we're in a blockquote
-    if (!editor.isActive('blockquote')) {
-      editor.chain().focus().toggleBlockquote().run()
-    }
-    // Then set the color attributes
-    setTimeout(() => {
-      editor.chain().focus().updateAttributes('blockquote', { 
-        borderColor: color, 
-        backgroundColor: lightColor 
-      }).run()
-    }, 10)
+    // Only update color attributes - blockquote should already exist
+    editor.chain().focus().updateAttributes('blockquote', { 
+      borderColor: color, 
+      backgroundColor: lightColor 
+    }).run()
   }
 
   function handleTableColorClick() {
@@ -687,6 +774,72 @@ export default function Editor({ value, onChange, onError }) {
   return (
     <div className="editor-shell">
       <div className="editor-toolbar">
+        <div className="toolbar-group">
+          <label htmlFor="font-size-input" className="toolbar-label">Font Size:</label>
+          <button
+            type="button"
+            className="toolbar-button toolbar-icon-button"
+            onClick={() => {
+              const currentSize = parseInt(editor.getAttributes('textStyle').fontSize || '16', 10)
+              const newSize = Math.max(8, currentSize - 2)
+              editor.chain().focus().setFontSize(`${newSize}px`).run()
+            }}
+            title="Decrease font size"
+          >
+            <FaMinus />
+          </button>
+          <input
+            type="number"
+            id="font-size-input"
+            min="8"
+            max="72"
+            className="toolbar-font-size-input"
+            value={parseInt(editor.getAttributes('textStyle').fontSize || '16', 10)}
+            onChange={(e) => {
+              const size = Math.max(8, Math.min(72, parseInt(e.target.value, 10) || 16))
+              editor.chain().focus().setFontSize(`${size}px`).run()
+            }}
+            title="Set font size"
+          />
+          <button
+            type="button"
+            className="toolbar-button toolbar-icon-button"
+            onClick={() => {
+              const currentSize = parseInt(editor.getAttributes('textStyle').fontSize || '16', 10)
+              const newSize = Math.min(72, currentSize + 2)
+              editor.chain().focus().setFontSize(`${newSize}px`).run()
+            }}
+            title="Increase font size"
+          >
+            <FaPlus />
+          </button>
+        </div>
+
+        <div className="toolbar-divider" />
+
+        <div className="toolbar-group">
+          <ToolbarButton
+            active={editor.isActive({ textAlign: 'left' })}
+            icon={<FaAlignLeft />}
+            label="Align Left"
+            onClick={() => editor.chain().focus().setTextAlign('left').run()}
+          />
+          <ToolbarButton
+            active={editor.isActive({ textAlign: 'center' })}
+            icon={<FaAlignCenter />}
+            label="Align Center"
+            onClick={() => editor.chain().focus().setTextAlign('center').run()}
+          />
+          <ToolbarButton
+            active={editor.isActive({ textAlign: 'right' })}
+            icon={<FaAlignRight />}
+            label="Align Right"
+            onClick={() => editor.chain().focus().setTextAlign('right').run()}
+          />
+        </div>
+
+        <div className="toolbar-divider" />
+
         <ToolbarButton
           active={editor.isActive('heading', { level: 2 })}
           icon={<><FaHeading />2</>}
@@ -742,7 +895,6 @@ export default function Editor({ value, onChange, onError }) {
           onClick={handleLinkClick}
         />
         <ToolbarButton
-          style={{padding: "20px"}}
           icon={<FaPalette />}
           label="Color"
           colorIndicator={selectedColor}
@@ -884,20 +1036,28 @@ export default function Editor({ value, onChange, onError }) {
                     className="color-swatch"
                     type="button"
                     style={{ background: color }}
-                    onClick={() => handleSetQuoteColor(color)}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleSetQuoteColor(color)
+                    }}
                   />
                 ))}
               </div>
               <input
                 type="color"
-                onChange={(event) => handleSetQuoteColor(event.target.value)}
+                onChange={(event) => {
+                  handleSetQuoteColor(event.target.value)
+                }}
               />
             </div>
             <div className="color-picker-actions">
               <button
                 className="button button--ghost button--small"
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
                   editor.chain().focus().toggleBlockquote().run()
                   setQuoteColorPickerOpen(false)
                 }}
@@ -907,7 +1067,11 @@ export default function Editor({ value, onChange, onError }) {
               <button
                 className="button button--ghost button--small"
                 type="button"
-                onClick={() => setQuoteColorPickerOpen(false)}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setQuoteColorPickerOpen(false)
+                }}
               >
                 Cancel
               </button>

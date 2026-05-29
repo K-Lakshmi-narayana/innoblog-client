@@ -56,6 +56,8 @@ function App() {
   const [domainStats, setDomainStats] = useState({})
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [catalogError, setCatalogError] = useState('')
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
+  const [logoutPending, setLogoutPending] = useState(false)
 
   const initialLoadRef = useRef(true)
   const [navigationLoading, setNavigationLoading] = useState(false)
@@ -188,7 +190,13 @@ function App() {
     setDomainStats(statsMap)
   }
 
-  async function handleLogout() {
+  function handleLogout() {
+    setLogoutConfirmOpen(true)
+  }
+
+  async function handleConfirmLogout() {
+    setLogoutPending(true)
+
     try {
       await apiRequest('/auth/logout', {
         method: 'POST',
@@ -198,7 +206,15 @@ function App() {
     }
 
     setSession(null)
+    setLogoutPending(false)
+    setLogoutConfirmOpen(false)
     navigateTo('/')
+  }
+
+  function handleCancelLogout() {
+    if (!logoutPending) {
+      setLogoutConfirmOpen(false)
+    }
   }
 
   function handleAuthenticated(nextSession) {
@@ -599,10 +615,43 @@ function App() {
         </ErrorBoundary>
       </main>
       <SiteFooter domains={domains} />
+      {logoutConfirmOpen ? (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            className="panel confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="logout-confirm-title"
+          >
+            <span className="eyebrow">Confirm logout</span>
+            <h2 id="logout-confirm-title">Do you want to logout?</h2>
+            <p>Your current session will be closed on this device.</p>
+            <div className="confirm-modal__actions">
+              <button
+                className="button button--ghost"
+                type="button"
+                onClick={handleCancelLogout}
+                disabled={logoutPending}
+              >
+                Cancel
+              </button>
+              <button
+                className="button button--primary"
+                type="button"
+                onClick={handleConfirmLogout}
+                disabled={logoutPending}
+              >
+                {logoutPending ? 'Logging out...' : 'Logout'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {navigationLoading ? (
-        <div className="page-loading-overlay" aria-hidden="true">
+        <div className="page-loading-overlay" role="status" aria-live="polite">
           <div className="page-loading-overlay__content">
             <LoadingDots />
+            <span>Loading...</span>
           </div>
         </div>
       ) : null}
