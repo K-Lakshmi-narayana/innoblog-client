@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiRequest } from '../api'
 import ArticleCard from '../components/ArticleCard'
 import LoadingDots from '../components/LoadingDots'
@@ -84,6 +84,11 @@ export default function LandingPage({
   const [suggestionFeedback, setSuggestionFeedback] = useState('')
   const [suggestionError, setSuggestionError] = useState('')
   const [suggestionLoading, setSuggestionLoading] = useState(false)
+  const featuredSwipeRef = useRef({
+    startX: 0,
+    startY: 0,
+    tracking: false,
+  })
 
   useEffect(() => {
     if (featuredArticles.length <= 1) {
@@ -153,6 +158,44 @@ export default function LandingPage({
     }
   }
 
+  function showFeaturedOffset(offset) {
+    if (featuredArticles.length <= 1) {
+      return
+    }
+
+    setFeaturedIndex((index) => (index + offset + featuredArticles.length) % featuredArticles.length)
+  }
+
+  function handleFeaturedTouchStart(event) {
+    const touch = event.touches?.[0]
+    if (!touch) {
+      return
+    }
+
+    featuredSwipeRef.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      tracking: true,
+    }
+  }
+
+  function handleFeaturedTouchEnd(event) {
+    const touch = event.changedTouches?.[0]
+    const swipe = featuredSwipeRef.current
+
+    if (!touch || !swipe.tracking) {
+      return
+    }
+
+    featuredSwipeRef.current.tracking = false
+    const deltaX = touch.clientX - swipe.startX
+    const deltaY = touch.clientY - swipe.startY
+
+    if (Math.abs(deltaX) > 42 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
+      showFeaturedOffset(deltaX < 0 ? 1 : -1)
+    }
+  }
+
   return (
     <div className="page-stack">
       <section className="hero panel">
@@ -160,7 +203,7 @@ export default function LandingPage({
           <span className="eyebrow">Discover quality articles</span>
           <h1>The future belongs to people who understand AI. Master AI by learning one article at a time.</h1>
           <p>
-            &nbsp;&nbsp;Explore a curated hub of cutting-edge articles, expert insights, and practical tutorials covering Artificial Intelligence, Machine Learning, Deep Learning, Computer Vision, Neural Networks, Generative AI, Data Science, and emerging technologies shaping the future. Learn from industry leaders as they simplify complex ideas, share real-world applications, and uncover the latest breakthroughs, tools, and trends. <br /> &nbsp;&nbsp; Whether you're a beginner, developer, researcher, or tech enthusiast, discover fresh perspectives, expand your knowledge, share your ideas, and become part of a thriving community passionate about innovation and the future of technology.
+            Explore a curated hub of cutting-edge articles, expert insights, and practical tutorials covering AI related emerging technologies shaping the future. Learn from industry leaders as they simplify complex ideas, share real-world applications, and uncover the latest breakthroughs, tools, and trends. <br /> <br /> Whether you're a beginner, developer, researcher, or tech enthusiast, discover fresh perspectives, expand your knowledge, share your ideas, and become part of a thriving community passionate about innovation and the future of technology.
           </p>
 
           <div className="hero__actions">
@@ -201,7 +244,11 @@ export default function LandingPage({
         {featuredArticles.length ? (
           <div className="spotlight-card featured-carousel" aria-label="Featured articles">
             <span className="eyebrow featured-spot">Featured articles</span>
-            <div className="featured-carousel__viewport">
+            <div
+              className="featured-carousel__viewport"
+              onTouchStart={handleFeaturedTouchStart}
+              onTouchEnd={handleFeaturedTouchEnd}
+            >
               <div
                 className="featured-carousel__track"
                 style={{ transform: `translateX(-${featuredIndex * 100}%)` }}

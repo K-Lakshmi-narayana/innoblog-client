@@ -32,10 +32,10 @@ export const FIELD_LIMITS = {
 }
 
 export const ARTICLE_IMAGE_LIMITS = {
-  maxBytes: 2 * 1024 * 1024,
-  totalMaxBytes: 8 * 1024 * 1024,
+  maxBytes: 10 * 1024 * 1024,
+  totalMaxBytes: 80 * 1024 * 1024,
   maxUploadedImages: 8,
-  allowedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+  allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
 }
 
 export function formatFileSize(bytes) {
@@ -109,7 +109,7 @@ function getDataUrlImageInfo(dataUrl = '') {
 function getUploadedBodyImages(body = '') {
   const images = []
   const sourceHtml = String(body || '')
-  const imageRegex = /<img\b[^>]*\bsrc=(["'])(data:[^"']+)\1[^>]*>/gi
+  const imageRegex = /<img\b[^>]*\bsrc=(["'])([^"']+)\1[^>]*>/gi
   let match = imageRegex.exec(sourceHtml)
 
   while (match) {
@@ -130,7 +130,7 @@ export function validateImageFile(file, label = 'Image') {
   }
 
   if (!ARTICLE_IMAGE_LIMITS.allowedTypes.includes(file.type)) {
-    return `${label} must be a JPEG, PNG, WebP, or GIF file.`
+    return `${label} must be a JPEG, PNG, or WebP file.`
   }
 
   if (file.size > ARTICLE_IMAGE_LIMITS.maxBytes) {
@@ -146,14 +146,14 @@ function validateDataUrlImage(dataUrl, label) {
   if (!imageInfo) {
     return {
       byteSize: 0,
-      error: `${label} could not be read. Upload it again as a JPEG, PNG, WebP, or GIF image.`,
+      error: `${label} could not be read. Upload it again as a JPEG, PNG, or WebP image.`,
     }
   }
 
   if (!ARTICLE_IMAGE_LIMITS.allowedTypes.includes(imageInfo.mimeType)) {
     return {
       byteSize: imageInfo.byteSize,
-      error: 'Article images must be JPEG, PNG, WebP, or GIF files.',
+      error: 'Article images must be JPEG, PNG, or WebP files.',
     }
   }
 
@@ -172,7 +172,7 @@ function validateDataUrlImage(dataUrl, label) {
 
 export function getUploadedImageCount({ body = '', coverImage = '' } = {}) {
   return [
-    ...(String(coverImage || '').trim().startsWith('data:') ? [coverImage] : []),
+    ...(String(coverImage || '').trim() ? [coverImage] : []),
     ...getUploadedBodyImages(body),
   ].length
 }
@@ -181,7 +181,7 @@ export function validateArticleImages({ body = '', coverImage = '' } = {}) {
   const imageEntries = []
   const trimmedCoverImage = String(coverImage || '').trim()
 
-  if (trimmedCoverImage.startsWith('data:')) {
+  if (trimmedCoverImage) {
     imageEntries.push({
       label: 'Cover image',
       src: trimmedCoverImage,
@@ -202,6 +202,10 @@ export function validateArticleImages({ body = '', coverImage = '' } = {}) {
   let totalImageBytes = 0
 
   for (const imageEntry of imageEntries) {
+    if (!String(imageEntry.src || '').startsWith('data:')) {
+      continue
+    }
+
     const validation = validateDataUrlImage(imageEntry.src, imageEntry.label)
     totalImageBytes += validation.byteSize
 

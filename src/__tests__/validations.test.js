@@ -53,17 +53,17 @@ describe('frontend validation utilities', () => {
       'large.png',
       { type: 'image/png' },
     )
-    expect(validateImageFile(oversizedFile, 'Cover image')).toContain('2 MB or smaller')
+    expect(validateImageFile(oversizedFile, 'Cover image')).toContain('10 MB or smaller')
 
     expect(
       validateImageFile(new File(['svg'], 'diagram.svg', { type: 'image/svg+xml' })),
-    ).toContain('JPEG, PNG, WebP, or GIF')
+    ).toContain('JPEG, PNG, or WebP')
 
     expect(
       validateArticleImages({
         body: `<p>${'A'.repeat(150)}</p><img src="${buildDataImage(100, 'image/svg+xml')}" />`,
       }),
-    ).toContain('JPEG, PNG, WebP, or GIF')
+    ).toContain('JPEG, PNG, or WebP')
   })
 
   it('validates tag counts and tag lengths', () => {

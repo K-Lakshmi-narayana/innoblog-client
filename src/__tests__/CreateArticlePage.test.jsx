@@ -51,6 +51,15 @@ describe('CreateArticlePage', () => {
         return Promise.resolve({ tags: mlTags })
       }
 
+      if (endpoint === '/uploads/cover') {
+        return Promise.resolve({
+          image: {
+            path: '/uploads/covers/cover.png',
+            url: 'http://localhost:4000/uploads/covers/cover.png',
+          },
+        })
+      }
+
       if (options?.method === 'POST') {
         return Promise.resolve({ draft: { id: 'draft-1' } })
       }
@@ -147,44 +156,33 @@ describe('CreateArticlePage', () => {
   })
 
   it('renders a cover image preview after upload', async () => {
-    const originalFileReader = global.FileReader
+    render(<CreateArticlePage onPublish={vi.fn()} session={session} />)
 
-    global.FileReader = class MockFileReader {
-      constructor() {
-        this.result = 'data:image/png;base64,cover-preview'
-        this.onload = null
-      }
+    const file = new File(['cover-image'], 'cover.png', { type: 'image/png' })
+    fireEvent.change(screen.getByLabelText(/Cover picture/i), {
+      target: { files: [file] },
+    })
 
-      readAsDataURL() {
-        if (this.onload) {
-          this.onload()
-        }
-      }
-    }
+    await waitFor(() => {
+      expect(screen.getByAltText('Cover preview')).toHaveAttribute(
+        'src',
+        'http://localhost:4000/uploads/covers/cover.png',
+      )
+    })
 
-    try {
-      render(<CreateArticlePage onPublish={vi.fn()} session={session} />)
-
-      const file = new File(['cover-image'], 'cover.png', { type: 'image/png' })
-      fireEvent.change(screen.getByLabelText(/Cover picture/i), {
-        target: { files: [file] },
-      })
-
-      await waitFor(() => {
-        expect(screen.getByAltText('Cover preview')).toHaveAttribute(
-          'src',
-          'data:image/png;base64,cover-preview',
-        )
-      })
-    } finally {
-      global.FileReader = originalFileReader
-    }
+    expect(apiRequest).toHaveBeenCalledWith(
+      '/uploads/cover',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.any(FormData),
+      }),
+    )
   })
 
   it('shows a clear error when a cover image is too large', async () => {
     render(<CreateArticlePage onPublish={vi.fn()} session={session} />)
 
-    const file = new File([new Uint8Array(2 * 1024 * 1024 + 1)], 'cover.png', {
+    const file = new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'cover.png', {
       type: 'image/png',
     })
     fireEvent.change(screen.getByLabelText(/Cover picture/i), {
@@ -192,7 +190,7 @@ describe('CreateArticlePage', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getAllByText(/Cover image must be 2 MB or smaller/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Cover image must be 10 MB or smaller/i).length).toBeGreaterThan(0)
     })
   })
 })

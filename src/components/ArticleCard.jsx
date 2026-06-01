@@ -1,5 +1,6 @@
 import { memo } from 'react'
 
+import { resolveImageUrl } from '../api'
 import { domainLookup } from '../data/siteContent'
 import { formatShortDate, getDisplayName, getHeadline } from '../utils/articleUtils'
 
@@ -7,6 +8,7 @@ function ArticleCard({ article, variant = 'default', href }) {
   const domain = domainLookup[article.domain]
   const authorName = getDisplayName(article.author)
   const authorHeadline = getHeadline(article.author)
+  const coverImageUrl = resolveImageUrl(article.coverImage)
   const articleIsPublic =
     article.isPubliclyVisible ?? article.publicationStatus === 'published'
   const targetHref = href || `/article/${article.slug}`
@@ -19,10 +21,10 @@ function ArticleCard({ article, variant = 'default', href }) {
   return (
     <a className={`article-card article-card--${variant}`} href={targetHref}>
       <div className="article-card__visual">
-        {article.coverImage ? (
+        {coverImageUrl ? (
           <img
             className="article-card__image"
-            src={article.coverImage}
+            src={coverImageUrl}
             alt=""
             width="640"
             height="360"

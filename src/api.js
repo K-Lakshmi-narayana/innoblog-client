@@ -1,6 +1,19 @@
 const API_BASE =
   import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1'
 
+function getApiOrigin() {
+  try {
+    const url =
+      typeof window !== 'undefined'
+        ? new URL(API_BASE, window.location.origin)
+        : new URL(API_BASE)
+
+    return url.origin
+  } catch {
+    return ''
+  }
+}
+
 function buildApiUrl(path) {
   const rawPath = String(path || '')
 
@@ -12,6 +25,21 @@ function buildApiUrl(path) {
   const requestPath = rawPath.startsWith('/') ? rawPath : `/${rawPath}`
 
   return `${base}${requestPath}`
+}
+
+function resolveImageUrl(path) {
+  const value = String(path || '').trim()
+
+  if (!value || /^(https?:|data:|blob:)/i.test(value)) {
+    return value
+  }
+
+  if (value.startsWith('/uploads/')) {
+    const apiOrigin = getApiOrigin()
+    return apiOrigin ? `${apiOrigin}${value}` : value
+  }
+
+  return value
 }
 
 function buildRequestError(response, data = {}) {
@@ -28,6 +56,7 @@ function buildRequestError(response, data = {}) {
 
 export async function apiRequest(path, options = {}) {
   const { method = 'GET', body, headers = {}, token, timeout = 30000 } = options
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeout)
@@ -38,11 +67,11 @@ export async function apiRequest(path, options = {}) {
       credentials: 'include',
       signal: controller.signal,
       headers: {
-        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        ...(body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...headers,
       },
-      body: body ? JSON.stringify(body) : undefined,
+      body: body ? (isFormData ? body : JSON.stringify(body)) : undefined,
     })
 
     const rawText = await response.text()
@@ -72,4 +101,4 @@ export async function apiRequest(path, options = {}) {
   }
 }
 
-export { API_BASE }
+export { API_BASE, buildApiUrl, resolveImageUrl }

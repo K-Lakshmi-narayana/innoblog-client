@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import katex from 'katex'
-import { FaHeart, FaRegHeart } from 'react-icons/fa'
+import { FaChevronLeft, FaChevronRight, FaHeart, FaRegHeart } from 'react-icons/fa'
 
-import { apiRequest } from '../api'
+import { apiRequest, resolveImageUrl } from '../api'
 import ArticleCard from '../components/ArticleCard'
 import ShareButton from '../components/ShareButton'
 import LoadingDots from '../components/LoadingDots'
@@ -78,6 +78,105 @@ const BLOCK_ARTICLE_TAGS = new Set([
 ])
 
 const INLINE_TAGS_WITH_BLOCK_FALLBACK = new Set(['span', 'strong', 'em'])
+const VOID_ARTICLE_TAGS = new Set(['br', 'img'])
+
+function normalizeCarouselImages(value) {
+  if (!value) {
+    return []
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((image) => ({
+        src: resolveImageUrl(image?.src || ''),
+        alt: String(image?.alt || '').trim(),
+      }))
+      .filter((image) => image.src)
+  }
+
+  try {
+    return normalizeCarouselImages(JSON.parse(value))
+  } catch {
+    return []
+  }
+}
+
+function getCarouselDimension(value, fallback) {
+  const parsedValue = Number.parseInt(String(value || ''), 10)
+  return Number.isFinite(parsedValue) ? parsedValue : fallback
+}
+
+function ArticleImageCarousel({ images, width = 360, height = 540 }) {
+  const slides = normalizeCarouselImages(images)
+  const [activeIndex, setActiveIndex] = useState(0)
+
+  useEffect(() => {
+    if (slides.length <= 1) {
+      return undefined
+    }
+
+    const timer = window.setInterval(() => {
+      setActiveIndex((index) => (index + 1) % slides.length)
+    }, 3600)
+
+    return () => window.clearInterval(timer)
+  }, [slides.length])
+
+  if (!slides.length) {
+    return null
+  }
+
+  const safeActiveIndex = Math.min(activeIndex, slides.length - 1)
+
+  function showPrevious() {
+    setActiveIndex((index) => (index - 1 + slides.length) % slides.length)
+  }
+
+  function showNext() {
+    setActiveIndex((index) => (index + 1) % slides.length)
+  }
+
+  return (
+    <figure
+      className="article-image-carousel"
+      style={{
+        width: `${width}px`,
+        height: `${height}px`,
+        maxWidth: '100%',
+      }}
+    >
+      <img
+        src={slides[safeActiveIndex].src}
+        alt={slides[safeActiveIndex].alt || `Carousel image ${safeActiveIndex + 1}`}
+        loading="lazy"
+        decoding="async"
+      />
+      {slides.length > 1 ? (
+        <>
+          <button
+            type="button"
+            className="image-carousel-arrow image-carousel-arrow--prev"
+            onClick={showPrevious}
+            aria-label="Previous carousel image"
+          >
+            <FaChevronLeft />
+          </button>
+          <button
+            type="button"
+            className="image-carousel-arrow image-carousel-arrow--next"
+            onClick={showNext}
+            aria-label="Next carousel image"
+          >
+            <FaChevronRight />
+          </button>
+          <div className="image-carousel-count">
+            {safeActiveIndex + 1}/{slides.length}
+          </div>
+        </>
+      ) : null}
+    </figure>
+  )
+}
 
 function mergeClassNames(...classNames) {
   return classNames.filter(Boolean).join(' ')
@@ -123,9 +222,12 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
   const [error, setError] = useState('')
   const [commentBody, setCommentBody] = useState('')
   const [commentError, setCommentError] = useState('')
+  const [isLoadingComment, setIsLoadingComment] = useState(false)
+  const [deletingCommentIds, setDeletingCommentIds] = useState(new Set())
   const [interactionError, setInteractionError] = useState('')
   const [deleteError, setDeleteError] = useState('')
   const [activeHeading, setActiveHeading] = useState('')
+  const [readingAdsEnabled, setReadingAdsEnabled] = useState(true)
 
   useEffect(() => {
     let ignore = false
@@ -177,6 +279,29 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       ignore = true
     }
   }, [session, slug])
+
+  useEffect(() => {
+    let ignore = false
+
+    async function loadPublicSettings() {
+      try {
+        const settings = await apiRequest('/settings/public')
+        if (!ignore) {
+          setReadingAdsEnabled(settings.readingAdsEnabled !== false)
+        }
+      } catch {
+        if (!ignore) {
+          setReadingAdsEnabled(true)
+        }
+      }
+    }
+
+    loadPublicSettings()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!article?.id) {
@@ -299,6 +424,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       return
     }
 
+    setIsLoadingComment(true)
     try {
       const data = await apiRequest(`/articles/${article.id}/comments`, {
         method: 'POST',
@@ -321,6 +447,8 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       setCommentError('')
     } catch (submitError) {
       setCommentError(getUserFriendlyError(submitError))
+    } finally {
+      setIsLoadingComment(false)
     }
   }
 
@@ -352,6 +480,8 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       return
     }
 
+    setDeletingCommentIds((prev) => new Set([...prev, commentId]))
+
     try {
       await apiRequest(`/comments/${commentId}`, {
         method: 'DELETE',
@@ -369,6 +499,12 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       setInteractionError('')
     } catch (deleteError) {
       setInteractionError(getUserFriendlyError(deleteError))
+    } finally {
+      setDeletingCommentIds((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(commentId)
+        return newSet
+      })
     }
   }
 
@@ -456,11 +592,13 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
         tagProps.target = '_blank'
         tagProps.rel = 'noreferrer'
       } else if (attr.name === 'src') {
-        tagProps.src = attr.value
+        tagProps.src = resolveImageUrl(attr.value)
       } else if (attr.name === 'alt') {
         tagProps.alt = attr.value
       } else if (attr.name === 'title') {
         tagProps.title = attr.value
+      } else if ((attr.name === 'width' || attr.name === 'height') && /^\d+(\.\d+)?$/.test(attr.value)) {
+        tagProps[attr.name] = attr.value
       } else if (attr.name === 'style') {
         tagProps.style = {
           ...(tagProps.style || {}),
@@ -530,6 +668,25 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
     }
 
     const tagName = node.tagName.toLowerCase()
+
+    if (tagName === 'div' && node.getAttribute('data-type') === 'image-carousel') {
+      const storedImages = normalizeCarouselImages(node.getAttribute('data-images'))
+      const fallbackImages = Array.from(node.querySelectorAll('img'))
+        .map((image, index) => ({
+          src: image.getAttribute('src') || '',
+          alt: image.getAttribute('alt') || `Carousel image ${index + 1}`,
+        }))
+        .filter((image) => image.src)
+
+      return (
+        <ArticleImageCarousel
+          key={key}
+          images={storedImages.length ? storedImages : fallbackImages}
+          width={getCarouselDimension(node.getAttribute('data-width') || node.style.width, 360)}
+          height={getCarouselDimension(node.getAttribute('data-height') || node.style.height, 540)}
+        />
+      )
+    }
 
     // Handle Tiptap Math nodes (saved as <div data-type="math">)
     if (tagName === 'div' && node.getAttribute('data-type') === 'math') {
@@ -610,6 +767,10 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
     )
 
     const tagProps = getElementProps(node)
+    if (tagName === 'img') {
+      tagProps.loading = tagProps.loading || 'lazy'
+      tagProps.decoding = tagProps.decoding || 'async'
+    }
     const hasBlockChild = hasBlockArticleDescendant(children)
     let elementTag = VALID_ARTICLE_TAGS.has(tagName) ? tagName : 'div'
 
@@ -628,8 +789,8 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       }
     }
 
-    return elementTag === 'br'
-      ? <br key={key} />
+    return VOID_ARTICLE_TAGS.has(elementTag)
+      ? React.createElement(elementTag, { key, ...tagProps })
       : React.createElement(elementTag, { key, ...tagProps }, children)
   }
 
@@ -659,7 +820,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       )
       
       // Inject multiple ads based on content length
-      if (renderedNodes.length > 8) {
+      if (readingAdsEnabled && renderedNodes.length > 8) {
         // For longer articles, inject ads at multiple points
         const positions = []
         if (renderedNodes.length > 20) {
@@ -680,7 +841,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
         positions.reverse().forEach((pos, idx) => {
           renderedNodes.splice(pos, 0, createAdBanner(`article-ad-banner-${idx}`))
         })
-      } else if (renderedNodes.length > 4) {
+      } else if (readingAdsEnabled && renderedNodes.length > 4) {
         // For short articles, add one ad in the middle
         renderedNodes.splice(Math.floor(renderedNodes.length / 2), 0, createAdBanner('article-ad-banner'))
       }
@@ -692,9 +853,12 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
     }
   }
 
-  // The parser helpers above are pure; only the saved article HTML should trigger reparsing.
+  // The parser helpers above are pure; only saved article HTML and ad settings should trigger reparsing.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const parsedBody = useMemo(() => parseArticleBody(article?.bodyHtml || ''), [article?.bodyHtml])
+  const parsedBody = useMemo(() => parseArticleBody(article?.bodyHtml || ''), [
+    article?.bodyHtml,
+    readingAdsEnabled,
+  ])
 
   function getVisibilityMessage(status) {
     if (status === 'pending_review') {
@@ -862,7 +1026,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
 
         <div className="story-hero__visual">
           {article.coverImage ? (
-            <img src={article.coverImage} alt={article.title} />
+            <img src={resolveImageUrl(article.coverImage)} alt={article.title} />
           ) : (
             <>
               <span>{article.coverLabel}</span>
@@ -906,21 +1070,22 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
               )}
             </div>
           
-            {/* Vertical Ad Box */}
-            <a 
-              href="https://www.innomatics.in/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="panel sidebar-card vertical-ad-box"
-            >
-              <span className="ad-label">Sponsored</span>
-              <div className="ad-content">
-                <div className="ad-icon">IRL</div>
-                <h4>Innomatics</h4>
-                <p>Data and AI programs</p>
-                <div className="ad-button">Learn more</div>
-              </div>
-            </a>
+            {readingAdsEnabled ? (
+              <a 
+                href="https://www.innomatics.in/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="panel sidebar-card vertical-ad-box"
+              >
+                <span className="ad-label">Sponsored</span>
+                <div className="ad-content">
+                  <div className="ad-icon">IRL</div>
+                  <h4>Innomatics</h4>
+                  <p>Data and AI programs</p>
+                  <div className="ad-button">Learn more</div>
+                </div>
+              </a>
+            ) : null}
           </div>
         </aside>
       </section>
@@ -1015,9 +1180,9 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
                   <button
                     className="button button--primary button--small"
                     type="submit"
-                    disabled={session?.user ? !commentBody.trim() : false}
+                    disabled={session?.user ? !commentBody.trim() || isLoadingComment : false}
                   >
-                    Comment
+                    {isLoadingComment ? <LoadingDots /> : 'Comment'}
                   </button>
                 </div>
               </div>
@@ -1042,8 +1207,9 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
                             type="button"
                             className="comment-delete"
                             onClick={() => handleCommentDelete(comment.id)}
+                            disabled={deletingCommentIds.has(comment.id)}
                           >
-                            Delete
+                            {deletingCommentIds.has(comment.id) ? <LoadingDots /> : 'Delete'}
                           </button>
                         ) : null}
                       </div>

@@ -81,6 +81,8 @@ export default function ProfilePage({
   const [adminMetrics, setAdminMetrics] = useState(null)
   const [adminMetricsLoading, setAdminMetricsLoading] = useState(false)
   const [adminMetricsError, setAdminMetricsError] = useState('')
+  const [adminSettings, setAdminSettings] = useState({ readingAdsEnabled: true })
+  const [adminSettingsLoading, setAdminSettingsLoading] = useState(false)
 
   const viewingSelf =
     handle === 'me' || Boolean(session?.user?.profile?.handle && session.user.profile.handle === handle)
@@ -100,6 +102,20 @@ export default function ProfilePage({
       setAdminMetricsError(error.message)
     } finally {
       setAdminMetricsLoading(false)
+    }
+  }, [session?.user?.role, viewingSelf])
+
+  const loadAdminSettings = useCallback(async () => {
+    if (!viewingSelf || session?.user?.role !== 'admin') return
+
+    setAdminSettingsLoading(true)
+    try {
+      const data = await apiRequest('/admin/settings')
+      setAdminSettings({ readingAdsEnabled: data.readingAdsEnabled !== false })
+    } catch (error) {
+      setFeedback(getUserFriendlyError(error))
+    } finally {
+      setAdminSettingsLoading(false)
     }
   }, [session?.user?.role, viewingSelf])
 
@@ -281,8 +297,9 @@ export default function ProfilePage({
     if (viewingSelf && session?.user?.role === 'admin') {
       loadPublicationRequests()
       loadAdminMetrics()
+      loadAdminSettings()
     }
-  }, [loadAdminMetrics, loadPublicationRequests, viewingSelf, session?.user?.role])
+  }, [loadAdminMetrics, loadAdminSettings, loadPublicationRequests, viewingSelf, session?.user?.role])
 
   function updateField(event) {
     const { name, value } = event.target
@@ -449,7 +466,27 @@ export default function ProfilePage({
     }
   }
 
+  async function handleToggleReadingAds(event) {
+    const readingAdsEnabled = event.target.checked
+    const previousSettings = adminSettings
 
+    setAdminSettings({ readingAdsEnabled })
+    setAdminSettingsLoading(true)
+
+    try {
+      const data = await apiRequest('/admin/settings', {
+        method: 'PATCH',
+        body: { readingAdsEnabled },
+      })
+      setAdminSettings({ readingAdsEnabled: data.readingAdsEnabled !== false })
+      setFeedback(readingAdsEnabled ? 'Article ads enabled.' : 'Article ads disabled.')
+    } catch (error) {
+      setAdminSettings(previousSettings)
+      setFeedback(getUserFriendlyError(error))
+    } finally {
+      setAdminSettingsLoading(false)
+    }
+  }
 
   function handlePreviousPage() {
     setPage((current) => Math.max(1, current - 1))
@@ -566,6 +603,23 @@ export default function ProfilePage({
 
       {viewingSelf ? (
         <section className="profile-layout">
+          <div>
+          <div style={{marginBottom: "12px"}} className="panel profile-admin__card">
+                <span className="eyebrow">Reading ads</span>
+                <label className="admin-toggle">
+                  <span>
+                    <strong>Show article ads</strong>
+                    <small>Controls vertical sidebar ads and horizontal in-article ads for readers.</small>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={adminSettings.readingAdsEnabled}
+                    onChange={handleToggleReadingAds}
+                    disabled={adminSettingsLoading}
+                  />
+                  <span className="admin-toggle__track" aria-hidden="true" />
+                </label>
+              </div>
           <form className="panel profile-editor" onSubmit={handleSaveProfile}>
             <div className="section-heading section-heading--tight">
               <div>
@@ -633,10 +687,11 @@ export default function ProfilePage({
 
             {feedback ? <p className="form-message form-message--error">{feedback}</p> : null}
 
-            <button className="button button--primary" type="submit">
+            <button style={{marginBottom: "20px", marginTop: "10px"}} className="button button--primary" type="submit">
               Save profile
             </button>
           </form>
+          </div>
 
           {session?.user?.role === 'admin' ? (
             <aside className="profile-admin">
