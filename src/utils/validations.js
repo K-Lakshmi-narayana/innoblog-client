@@ -16,6 +16,7 @@ export const FIELD_LIMITS = {
   coverLabel: { min: 0, max: 100 },
   body: { min: 120, max: 60000 },
   bodyHtml: { max: 150000 },
+  unbrokenText: { max: 80 },
   
   // Tags
   tag: { max: MAX_ARTICLE_TAG_LENGTH },
@@ -31,10 +32,10 @@ export const FIELD_LIMITS = {
 }
 
 export const ARTICLE_IMAGE_LIMITS = {
-  maxBytes: 2 * 1024 * 1024,
-  totalMaxBytes: 8 * 1024 * 1024,
+  maxBytes: 10 * 1024 * 1024,
+  totalMaxBytes: 80 * 1024 * 1024,
   maxUploadedImages: 8,
-  allowedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+  allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
 }
 
 export function formatFileSize(bytes) {
@@ -48,6 +49,26 @@ export function formatFileSize(bytes) {
 
 function formatNumber(value) {
   return Number(value).toLocaleString('en-US')
+}
+
+function stripHtml(value = '') {
+  return String(value || '').replace(/<[^>]*>/g, ' ')
+}
+
+function getLongUnbrokenTextRun(value = '') {
+  return stripHtml(value)
+    .split(/\s+/)
+    .find((part) => part.length > FIELD_LIMITS.unbrokenText.max)
+}
+
+function validateUnbrokenTextRun(value, label) {
+  const longRun = getLongUnbrokenTextRun(value)
+
+  if (!longRun) {
+    return null
+  }
+
+  return `${label} contains a word or unbroken text run over ${FIELD_LIMITS.unbrokenText.max} characters. Add spaces or punctuation so it can wrap cleanly.`
 }
 
 function getDataUrlImageInfo(dataUrl = '') {
@@ -88,7 +109,7 @@ function getDataUrlImageInfo(dataUrl = '') {
 function getUploadedBodyImages(body = '') {
   const images = []
   const sourceHtml = String(body || '')
-  const imageRegex = /<img\b[^>]*\bsrc=(["'])(data:[^"']+)\1[^>]*>/gi
+  const imageRegex = /<img\b[^>]*\bsrc=(["'])([^"']+)\1[^>]*>/gi
   let match = imageRegex.exec(sourceHtml)
 
   while (match) {
@@ -109,7 +130,7 @@ export function validateImageFile(file, label = 'Image') {
   }
 
   if (!ARTICLE_IMAGE_LIMITS.allowedTypes.includes(file.type)) {
-    return `${label} must be a JPEG, PNG, WebP, or GIF file.`
+    return `${label} must be a JPEG, PNG, or WebP file.`
   }
 
   if (file.size > ARTICLE_IMAGE_LIMITS.maxBytes) {
@@ -125,14 +146,14 @@ function validateDataUrlImage(dataUrl, label) {
   if (!imageInfo) {
     return {
       byteSize: 0,
-      error: `${label} could not be read. Upload it again as a JPEG, PNG, WebP, or GIF image.`,
+      error: `${label} could not be read. Upload it again as a JPEG, PNG, or WebP image.`,
     }
   }
 
   if (!ARTICLE_IMAGE_LIMITS.allowedTypes.includes(imageInfo.mimeType)) {
     return {
       byteSize: imageInfo.byteSize,
-      error: 'Article images must be JPEG, PNG, WebP, or GIF files.',
+      error: 'Article images must be JPEG, PNG, or WebP files.',
     }
   }
 
@@ -151,7 +172,7 @@ function validateDataUrlImage(dataUrl, label) {
 
 export function getUploadedImageCount({ body = '', coverImage = '' } = {}) {
   return [
-    ...(String(coverImage || '').trim().startsWith('data:') ? [coverImage] : []),
+    ...(String(coverImage || '').trim() ? [coverImage] : []),
     ...getUploadedBodyImages(body),
   ].length
 }
@@ -160,7 +181,7 @@ export function validateArticleImages({ body = '', coverImage = '' } = {}) {
   const imageEntries = []
   const trimmedCoverImage = String(coverImage || '').trim()
 
-  if (trimmedCoverImage.startsWith('data:')) {
+  if (trimmedCoverImage) {
     imageEntries.push({
       label: 'Cover image',
       src: trimmedCoverImage,
@@ -181,6 +202,10 @@ export function validateArticleImages({ body = '', coverImage = '' } = {}) {
   let totalImageBytes = 0
 
   for (const imageEntry of imageEntries) {
+    if (!String(imageEntry.src || '').startsWith('data:')) {
+      continue
+    }
+
     const validation = validateDataUrlImage(imageEntry.src, imageEntry.label)
     totalImageBytes += validation.byteSize
 
@@ -216,6 +241,10 @@ export function validateTitle(title) {
   if (title.length > FIELD_LIMITS.title.max) {
     return `Title must not exceed ${FIELD_LIMITS.title.max} characters.`
   }
+  const unbrokenTextError = validateUnbrokenTextRun(title, 'Title')
+  if (unbrokenTextError) {
+    return unbrokenTextError
+  }
   return null
 }
 
@@ -229,6 +258,10 @@ export function validateSummary(summary) {
   if (summary.length > FIELD_LIMITS.summary.max) {
     return `Summary must not exceed ${FIELD_LIMITS.summary.max} characters.`
   }
+  const unbrokenTextError = validateUnbrokenTextRun(summary, 'Summary')
+  if (unbrokenTextError) {
+    return unbrokenTextError
+  }
   return null
 }
 
@@ -236,13 +269,15 @@ export function validateCoverLabel(coverLabel) {
   if (coverLabel && coverLabel.length > FIELD_LIMITS.coverLabel.max) {
     return `Cover label must not exceed ${FIELD_LIMITS.coverLabel.max} characters.`
   }
+  const unbrokenTextError = validateUnbrokenTextRun(coverLabel, 'Cover label')
+  if (unbrokenTextError) {
+    return unbrokenTextError
+  }
   return null
 }
 
 export function validateBody(body) {
-  const plainText = body
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
-    .trim()
+  const plainText = stripHtml(body).trim()
   
   if (!plainText || plainText.length < FIELD_LIMITS.body.min) {
     return `Article body must have at least ${FIELD_LIMITS.body.min} characters.`
@@ -253,6 +288,10 @@ export function validateBody(body) {
   const payloadError = validateArticlePayloadSize(body)
   if (payloadError) {
     return payloadError
+  }
+  const unbrokenTextError = validateUnbrokenTextRun(plainText, 'Article body')
+  if (unbrokenTextError) {
+    return unbrokenTextError
   }
   return null
 }

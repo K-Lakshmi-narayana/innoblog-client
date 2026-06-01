@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { apiRequest } from '../api'
+import { API_BASE, apiRequest, buildApiUrl, resolveImageUrl } from '../api'
 
 describe('apiRequest', () => {
   beforeEach(() => {
@@ -61,5 +61,15 @@ describe('apiRequest', () => {
       message: 'Unexpected failure',
       status: 500,
     })
+  })
+
+  it('builds API and upload asset URLs without appending to the frontend origin', () => {
+    expect(buildApiUrl('/articles')).toBe(`${API_BASE.replace(/\/+$/, '')}/articles`)
+    expect(resolveImageUrl('/uploads/covers/cover.png')).toBe(
+      'http://localhost:4000/uploads/covers/cover.png',
+    )
+    expect(resolveImageUrl('https://cdn.example.com/cover.png')).toBe(
+      'https://cdn.example.com/cover.png',
+    )
   })
 })

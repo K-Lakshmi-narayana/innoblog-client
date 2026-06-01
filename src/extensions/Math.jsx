@@ -1,27 +1,24 @@
 import { Node, mergeAttributes } from '@tiptap/core'
-import { NodeViewWrapper, NodeViewContent, ReactNodeViewRenderer } from '@tiptap/react'
-import { useEffect, useState } from 'react'
+import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react'
+import { useState } from 'react'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import { FaTrash, FaEdit } from 'react-icons/fa'
 
-function MathComponent({ node, updateAttributes, deleteNode, editor, selected }) {
+function MathComponent({ node, updateAttributes, deleteNode, selected }) {
   const [isEditing, setIsEditing] = useState(false)
   const [latex, setLatex] = useState(node.attrs.latex || '')
-  const [renderError, setRenderError] = useState('')
 
   const handleSave = () => {
     if (latex.trim()) {
       updateAttributes({ latex })
       setIsEditing(false)
-      setRenderError('')
     }
   }
 
   const handleCancel = () => {
     setLatex(node.attrs.latex)
     setIsEditing(false)
-    setRenderError('')
   }
 
   let renderedMath = null
@@ -30,8 +27,8 @@ function MathComponent({ node, updateAttributes, deleteNode, editor, selected })
       throwOnError: false,
       displayMode: true,
     })
-  } catch (err) {
-    setRenderError('Invalid LaTeX formula')
+  } catch {
+    renderedMath = null
   }
 
   return (
@@ -107,6 +104,7 @@ function MathComponent({ node, updateAttributes, deleteNode, editor, selected })
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const Math = Node.create({
   name: 'math',
   group: 'block',

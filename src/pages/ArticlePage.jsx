@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react'
-import MonacoEditor from '@monaco-editor/react'
+import React, { useEffect, useMemo, useState } from 'react'
 import katex from 'katex'
-import { FaHeart, FaRegHeart } from 'react-icons/fa'
+import { FaChevronLeft, FaChevronRight, FaHeart, FaRegHeart } from 'react-icons/fa'
 
-import { apiRequest } from '../api'
+import { apiRequest, resolveImageUrl } from '../api'
 import ArticleCard from '../components/ArticleCard'
 import ShareButton from '../components/ShareButton'
 import LoadingDots from '../components/LoadingDots'
@@ -14,7 +13,202 @@ import {
   formatLongDate,
   formatShortDate,
   getDisplayName,
+  getInitials,
 } from '../utils/articleUtils'
+
+const VALID_ARTICLE_TAGS = new Set([
+  'div',
+  'p',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'span',
+  'blockquote',
+  'ul',
+  'ol',
+  'li',
+  'strong',
+  'em',
+  'a',
+  'img',
+  'figure',
+  'figcaption',
+  'table',
+  'thead',
+  'tbody',
+  'tr',
+  'th',
+  'td',
+  'pre',
+  'code',
+  'br',
+])
+
+const BLOCK_ARTICLE_TAGS = new Set([
+  'address',
+  'article',
+  'aside',
+  'blockquote',
+  'div',
+  'dl',
+  'fieldset',
+  'figcaption',
+  'figure',
+  'footer',
+  'form',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'header',
+  'hr',
+  'main',
+  'nav',
+  'ol',
+  'p',
+  'pre',
+  'section',
+  'table',
+  'ul',
+])
+
+const INLINE_TAGS_WITH_BLOCK_FALLBACK = new Set(['span', 'strong', 'em'])
+const VOID_ARTICLE_TAGS = new Set(['br', 'img'])
+
+function normalizeCarouselImages(value) {
+  if (!value) {
+    return []
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((image) => ({
+        src: resolveImageUrl(image?.src || ''),
+        alt: String(image?.alt || '').trim(),
+      }))
+      .filter((image) => image.src)
+  }
+
+  try {
+    return normalizeCarouselImages(JSON.parse(value))
+  } catch {
+    return []
+  }
+}
+
+function getCarouselDimension(value, fallback) {
+  const parsedValue = Number.parseInt(String(value || ''), 10)
+  return Number.isFinite(parsedValue) ? parsedValue : fallback
+}
+
+function ArticleImageCarousel({ images, width = 360, height = 540 }) {
+  const slides = normalizeCarouselImages(images)
+  const [activeIndex, setActiveIndex] = useState(0)
+
+  useEffect(() => {
+    if (slides.length <= 1) {
+      return undefined
+    }
+
+    const timer = window.setInterval(() => {
+      setActiveIndex((index) => (index + 1) % slides.length)
+    }, 3600)
+
+    return () => window.clearInterval(timer)
+  }, [slides.length])
+
+  if (!slides.length) {
+    return null
+  }
+
+  const safeActiveIndex = Math.min(activeIndex, slides.length - 1)
+
+  function showPrevious() {
+    setActiveIndex((index) => (index - 1 + slides.length) % slides.length)
+  }
+
+  function showNext() {
+    setActiveIndex((index) => (index + 1) % slides.length)
+  }
+
+  return (
+    <figure
+      className="article-image-carousel"
+      style={{
+        width: `${width}px`,
+        height: `${height}px`,
+        maxWidth: '100%',
+      }}
+    >
+      <img
+        src={slides[safeActiveIndex].src}
+        alt={slides[safeActiveIndex].alt || `Carousel image ${safeActiveIndex + 1}`}
+        loading="lazy"
+        decoding="async"
+      />
+      {slides.length > 1 ? (
+        <>
+          <button
+            type="button"
+            className="image-carousel-arrow image-carousel-arrow--prev"
+            onClick={showPrevious}
+            aria-label="Previous carousel image"
+          >
+            <FaChevronLeft />
+          </button>
+          <button
+            type="button"
+            className="image-carousel-arrow image-carousel-arrow--next"
+            onClick={showNext}
+            aria-label="Next carousel image"
+          >
+            <FaChevronRight />
+          </button>
+          <div className="image-carousel-count">
+            {safeActiveIndex + 1}/{slides.length}
+          </div>
+        </>
+      ) : null}
+    </figure>
+  )
+}
+
+function mergeClassNames(...classNames) {
+  return classNames.filter(Boolean).join(' ')
+}
+
+function hasBlockArticleDescendant(children) {
+  return React.Children.toArray(children).some((child) => {
+    if (!React.isValidElement(child)) {
+      return false
+    }
+
+    const childType = child.type
+    const childClassName = child.props?.className || ''
+
+    if (typeof childType === 'string' && BLOCK_ARTICLE_TAGS.has(childType)) {
+      return true
+    }
+
+    if (
+      typeof childClassName === 'string' &&
+      (
+        childClassName.includes('article-code-block') ||
+        childClassName.includes('article-ad-banner') ||
+        childClassName.includes('math-node')
+      )
+    ) {
+      return true
+    }
+
+    return hasBlockArticleDescendant(child.props?.children)
+  })
+}
 
 export default function ArticlePage({ slug, session, onDeleteArticle }) {
   const [article, setArticle] = useState(null)
@@ -28,9 +222,12 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
   const [error, setError] = useState('')
   const [commentBody, setCommentBody] = useState('')
   const [commentError, setCommentError] = useState('')
+  const [isLoadingComment, setIsLoadingComment] = useState(false)
+  const [deletingCommentIds, setDeletingCommentIds] = useState(new Set())
   const [interactionError, setInteractionError] = useState('')
   const [deleteError, setDeleteError] = useState('')
   const [activeHeading, setActiveHeading] = useState('')
+  const [readingAdsEnabled, setReadingAdsEnabled] = useState(true)
 
   useEffect(() => {
     let ignore = false
@@ -48,10 +245,10 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
         }
 
         setArticle(data.article)
-        setComments(data.comments)
+        setComments(data.comments || [])
         setTotalComments(data.totalComments || 0)
         setCommentPage(1)
-        setRelatedArticles(data.relatedArticles)
+        setRelatedArticles(data.relatedArticles || [])
         setRecommendedArticles([])
       } catch (loadError) {
         if (!ignore) {
@@ -82,6 +279,58 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       ignore = true
     }
   }, [session, slug])
+
+  useEffect(() => {
+    let ignore = false
+
+    async function loadPublicSettings() {
+      try {
+        const settings = await apiRequest('/settings/public')
+        if (!ignore) {
+          setReadingAdsEnabled(settings.readingAdsEnabled !== false)
+        }
+      } catch {
+        if (!ignore) {
+          setReadingAdsEnabled(true)
+        }
+      }
+    }
+
+    loadPublicSettings()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!article?.id) {
+      return
+    }
+
+    let ignore = false
+
+    async function loadInitialComments() {
+      try {
+        const data = await apiRequest(`/articles/${article.id}/comments?page=1&limit=10`)
+        if (!ignore) {
+          setComments(data.comments || [])
+          setTotalComments(data.totalComments || 0)
+          setCommentPage(1)
+        }
+      } catch (error) {
+        if (!ignore) {
+          console.error('Failed to load comments:', error)
+        }
+      }
+    }
+
+    loadInitialComments()
+
+    return () => {
+      ignore = true
+    }
+  }, [article?.id])
 
   useEffect(() => {
     const tocHeadings = article?.toc?.filter((entry) => entry.level === 2) || []
@@ -162,34 +411,6 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
     }
   }
 
-  async function handleFollowAuthor() {
-    if (!session?.user || !article?.author?.profile?.handle) {
-      navigateTo('/login')
-      return
-    }
-
-    try {
-      const data = await apiRequest(`/profiles/${article.author.profile.handle}/follow`, {
-        method: 'POST',
-      })
-
-      setArticle((currentArticle) =>
-        currentArticle
-          ? {
-              ...currentArticle,
-              author: {
-                ...currentArticle.author,
-                profile: data.profile,
-              },
-            }
-          : currentArticle,
-      )
-      setInteractionError('')
-    } catch (followError) {
-      setInteractionError(getUserFriendlyError(followError))
-    }
-  }
-
   async function handleCommentSubmit(event) {
     event.preventDefault()
 
@@ -203,6 +424,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       return
     }
 
+    setIsLoadingComment(true)
     try {
       const data = await apiRequest(`/articles/${article.id}/comments`, {
         method: 'POST',
@@ -225,6 +447,8 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       setCommentError('')
     } catch (submitError) {
       setCommentError(getUserFriendlyError(submitError))
+    } finally {
+      setIsLoadingComment(false)
     }
   }
 
@@ -256,6 +480,8 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       return
     }
 
+    setDeletingCommentIds((prev) => new Set([...prev, commentId]))
+
     try {
       await apiRequest(`/comments/${commentId}`, {
         method: 'DELETE',
@@ -273,6 +499,12 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       setInteractionError('')
     } catch (deleteError) {
       setInteractionError(getUserFriendlyError(deleteError))
+    } finally {
+      setDeletingCommentIds((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(commentId)
+        return newSet
+      })
     }
   }
 
@@ -343,6 +575,89 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
     return 'javascript'
   }
 
+  function getElementProps(node) {
+    const tagProps = {}
+
+    if (!node.hasAttributes()) {
+      return tagProps
+    }
+
+    Array.from(node.attributes).forEach((attr) => {
+      if (attr.name === 'class') {
+        tagProps.className = attr.value
+      } else if (attr.name === 'id') {
+        tagProps.id = attr.value
+      } else if (attr.name === 'href') {
+        tagProps.href = attr.value
+        tagProps.target = '_blank'
+        tagProps.rel = 'noreferrer'
+      } else if (attr.name === 'src') {
+        tagProps.src = resolveImageUrl(attr.value)
+      } else if (attr.name === 'alt') {
+        tagProps.alt = attr.value
+      } else if (attr.name === 'title') {
+        tagProps.title = attr.value
+      } else if ((attr.name === 'width' || attr.name === 'height') && /^\d+(\.\d+)?$/.test(attr.value)) {
+        tagProps[attr.name] = attr.value
+      } else if (attr.name === 'style') {
+        tagProps.style = {
+          ...(tagProps.style || {}),
+          ...parseStyleString(attr.value),
+        }
+      } else if (attr.name.startsWith('data-')) {
+        tagProps[attr.name] = attr.value
+
+        if (attr.name === 'data-header-color' && isSafeHeaderColor(attr.value)) {
+          tagProps.style = {
+            ...(tagProps.style || {}),
+            '--header-color': attr.value,
+          }
+        }
+      }
+    })
+
+    return tagProps
+  }
+
+  function renderTableCell(cell, key) {
+    const cellTag = cell.tagName.toLowerCase() === 'th' ? 'th' : 'td'
+    const cellProps = getElementProps(cell)
+    const children = Array.from(cell.childNodes)
+      .map((child, index) => renderHtmlNode(child, `${key}-${index}`))
+      .filter((child) => child !== null && child !== undefined && child !== '')
+
+    return React.createElement(cellTag, { key, ...cellProps }, children)
+  }
+
+  function renderTableRow(row, key) {
+    const cells = Array.from(row.children).filter((child) => {
+      const childTag = child.tagName.toLowerCase()
+      return childTag === 'td' || childTag === 'th'
+    })
+
+    return (
+      <tr key={key}>
+        {cells.length ? cells.map((cell, index) => renderTableCell(cell, `${key}-cell-${index}`)) : <td />}
+      </tr>
+    )
+  }
+
+  function renderTableNode(node, key) {
+    const rows = Array.from(node.querySelectorAll('tr'))
+
+    if (!rows.length) {
+      return null
+    }
+
+    return (
+      <table key={key} {...getElementProps(node)}>
+        <tbody>
+          {rows.map((row, index) => renderTableRow(row, `${key}-row-${index}`))}
+        </tbody>
+      </table>
+    )
+  }
+
   function renderHtmlNode(node, key) {
     if (node.nodeType === TEXT_NODE) {
       return node.textContent
@@ -353,6 +668,25 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
     }
 
     const tagName = node.tagName.toLowerCase()
+
+    if (tagName === 'div' && node.getAttribute('data-type') === 'image-carousel') {
+      const storedImages = normalizeCarouselImages(node.getAttribute('data-images'))
+      const fallbackImages = Array.from(node.querySelectorAll('img'))
+        .map((image, index) => ({
+          src: image.getAttribute('src') || '',
+          alt: image.getAttribute('alt') || `Carousel image ${index + 1}`,
+        }))
+        .filter((image) => image.src)
+
+      return (
+        <ArticleImageCarousel
+          key={key}
+          images={storedImages.length ? storedImages : fallbackImages}
+          width={getCarouselDimension(node.getAttribute('data-width') || node.style.width, 360)}
+          height={getCarouselDimension(node.getAttribute('data-height') || node.style.height, 540)}
+        />
+      )
+    }
 
     // Handle Tiptap Math nodes (saved as <div data-type="math">)
     if (tagName === 'div' && node.getAttribute('data-type') === 'math') {
@@ -406,27 +740,12 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       const code = node.querySelector('code')
       const language = getCodeLanguageFromAttributes(code || node)
       const value = code?.textContent || node.textContent || ''
-      const lineCount = value.split('\n').length || 1
-      const height = `${Math.max(40, Math.min(400, lineCount * 22 + 24))}px`
 
       return (
-        <div key={key} className="monaco-code-block">
-          <MonacoEditor
-            height={height}
-            language={language}
-            value={value}
-            theme="vs-dark"
-            options={{
-              readOnly: true,
-              minimap: { enabled: false },
-              fontSize: 14,
-              lineNumbers: 'on',
-              roundedSelection: false,
-              scrollBeyondLastLine: false,
-              automaticLayout: true,
-              wordWrap: 'on',
-            }}
-          />
+        <div key={key} className="article-code-block">
+          <pre>
+            <code className={`language-${language}`}>{value}</code>
+          </pre>
         </div>
       )
     }
@@ -439,81 +758,40 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       )
     }
 
+    if (tagName === 'table') {
+      return renderTableNode(node, key)
+    }
+
     const children = Array.from(node.childNodes).map((child, index) =>
       renderHtmlNode(child, `${key}-${index}`),
     )
 
-    const tagProps = { key }
-    if (node.hasAttributes()) {
-      Array.from(node.attributes).forEach((attr) => {
-        if (attr.name === 'class') {
-          tagProps.className = attr.value
-        } else if (attr.name === 'id') {
-          tagProps.id = attr.value
-        } else if (attr.name === 'href') {
-          tagProps.href = attr.value
-          tagProps.target = '_blank'
-          tagProps.rel = 'noreferrer'
-        } else if (attr.name === 'src') {
-          tagProps.src = attr.value
-        } else if (attr.name === 'alt') {
-          tagProps.alt = attr.value
-        } else if (attr.name === 'title') {
-          tagProps.title = attr.value
-        } else if (attr.name === 'style') {
-          tagProps.style = {
-            ...(tagProps.style || {}),
-            ...parseStyleString(attr.value),
-          }
-        } else if (attr.name.startsWith('data-')) {
-          tagProps[attr.name] = attr.value
+    const tagProps = getElementProps(node)
+    if (tagName === 'img') {
+      tagProps.loading = tagProps.loading || 'lazy'
+      tagProps.decoding = tagProps.decoding || 'async'
+    }
+    const hasBlockChild = hasBlockArticleDescendant(children)
+    let elementTag = VALID_ARTICLE_TAGS.has(tagName) ? tagName : 'div'
 
-          if (attr.name === 'data-header-color' && isSafeHeaderColor(attr.value)) {
-            tagProps.style = {
-              ...(tagProps.style || {}),
-              '--header-color': attr.value,
-            }
-          }
-        }
-      })
+    if (elementTag === 'p' && hasBlockChild) {
+      elementTag = 'div'
+      tagProps.className = mergeClassNames(tagProps.className, 'story-paragraph')
+    } else if (INLINE_TAGS_WITH_BLOCK_FALLBACK.has(elementTag) && hasBlockChild) {
+      const originalTag = elementTag
+      elementTag = 'div'
+      tagProps.className = mergeClassNames(tagProps.className, `story-inline-block story-inline-block--${originalTag}`)
+
+      if (originalTag === 'strong') {
+        tagProps.style = { ...(tagProps.style || {}), fontWeight: 700 }
+      } else if (originalTag === 'em') {
+        tagProps.style = { ...(tagProps.style || {}), fontStyle: 'italic' }
+      }
     }
 
-    const validTags = [
-      'div',
-      'p',
-      'h1',
-      'h2',
-      'h3',
-      'h4',
-      'h5',
-      'h6',
-      'span',
-      'blockquote',
-      'ul',
-      'ol',
-      'li',
-      'strong',
-      'em',
-      'a',
-      'img',
-      'figure',
-      'figcaption',
-      'table',
-      'thead',
-      'tbody',
-      'tr',
-      'th',
-      'td',
-      'pre',
-      'code',
-      'br',
-    ]
-
-    const elementTag = validTags.includes(tagName) ? tagName : 'div'
-
-    return elementTag === 'br'
-      ? <br key={key} />
-      : React.createElement(elementTag, tagProps, children)
+    return VOID_ARTICLE_TAGS.has(elementTag)
+      ? React.createElement(elementTag, { key, ...tagProps })
+      : React.createElement(elementTag, { key, ...tagProps }, children)
   }
 
   function parseArticleBody(html) {
@@ -542,7 +820,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
       )
       
       // Inject multiple ads based on content length
-      if (renderedNodes.length > 8) {
+      if (readingAdsEnabled && renderedNodes.length > 8) {
         // For longer articles, inject ads at multiple points
         const positions = []
         if (renderedNodes.length > 20) {
@@ -563,7 +841,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
         positions.reverse().forEach((pos, idx) => {
           renderedNodes.splice(pos, 0, createAdBanner(`article-ad-banner-${idx}`))
         })
-      } else if (renderedNodes.length > 4) {
+      } else if (readingAdsEnabled && renderedNodes.length > 4) {
         // For short articles, add one ad in the middle
         renderedNodes.splice(Math.floor(renderedNodes.length / 2), 0, createAdBanner('article-ad-banner'))
       }
@@ -575,7 +853,12 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
     }
   }
 
-  const parsedBody = parseArticleBody(article?.bodyHtml || '')
+  // The parser helpers above are pure; only saved article HTML and ad settings should trigger reparsing.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const parsedBody = useMemo(() => parseArticleBody(article?.bodyHtml || ''), [
+    article?.bodyHtml,
+    readingAdsEnabled,
+  ])
 
   function getVisibilityMessage(status) {
     if (status === 'pending_review') {
@@ -630,7 +913,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
     setLoadingMoreComments(true)
 
     try {
-      const data = await apiRequest(`/articles/${article.id}/comments?page=${commentPage + 1}&limit=20`)
+      const data = await apiRequest(`/articles/${article.id}/comments?page=${commentPage + 1}&limit=10`)
       setComments((currentComments) => [...currentComments, ...data.comments])
       setCommentPage(commentPage + 1)
     } catch (loadError) {
@@ -691,10 +974,6 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
   const articleIsPubliclyVisible = article.isPubliclyVisible ?? (
     article.publicationStatus === 'published'
   )
-  const canFollow =
-    Boolean(authorHandle) &&
-    session?.user?.profile?.handle !== authorHandle &&
-    Boolean(session?.user)
   const canManageArticle =
     Boolean(article) &&
     Boolean(session?.user) &&
@@ -725,11 +1004,6 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
           </div>
 
           <div className="story-actions">
-            {canFollow ? (
-              <button className="button button--secondary" type="button" onClick={handleFollowAuthor}>
-                {article.author?.profile?.isFollowing ? 'Unfollow author' : 'Follow author'}
-              </button>
-            ) : null}
 
             {canManageArticle ? (
               <a className="button button--secondary" href={`/article/${article.slug}/edit`}>
@@ -752,7 +1026,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
 
         <div className="story-hero__visual">
           {article.coverImage ? (
-            <img src={article.coverImage} alt={article.title} />
+            <img src={resolveImageUrl(article.coverImage)} alt={article.title} />
           ) : (
             <>
               <span>{article.coverLabel}</span>
@@ -796,26 +1070,26 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
               )}
             </div>
           
-            {/* Vertical Ad Box */}
-            <a 
-              href="https://www.innomatics.in/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="panel sidebar-card vertical-ad-box"
-            >
-              <span className="ad-label">Sponsored</span>
-              <div className="ad-content">
-                <div className="ad-icon">IRL</div>
-                <h4>Innomatics</h4>
-                <p>Data and AI programs</p>
-                <div className="ad-button">Learn more</div>
-              </div>
-            </a>
+            {readingAdsEnabled ? (
+              <a 
+                href="https://www.innomatics.in/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="panel sidebar-card vertical-ad-box"
+              >
+                <span className="ad-label">Sponsored</span>
+                <div className="ad-content">
+                  <div className="ad-icon">IRL</div>
+                  <h4>Innomatics</h4>
+                  <p>Data and AI programs</p>
+                  <div className="ad-button">Learn more</div>
+                </div>
+              </a>
+            ) : null}
           </div>
         </aside>
       </section>
 
-      {/* Article interactions section below the content */}
       <section className="panel article-afterword">
         <div className="article-afterword__main">
           <div>
@@ -851,6 +1125,7 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
         </div>
 
         <div className="article-afterword__meta">
+          <span className="article-afterword__label">Tags</span>
           <div className="article-afterword__tags">
             {articleTags.length ? (
               articleTags.map((tag) => (
@@ -867,24 +1142,50 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
 
       {/* Comments section */}
       {articleIsPubliclyVisible ? (
-        <section className="article-comments-section">
-          <div className="panel">
-            <span className="eyebrow">Discussion</span>
+        <section className="article-comments-section" aria-labelledby="article-comments-heading">
+          <div className="article-comments">
+            <div className="article-comments__header">
+              <h2 id="article-comments-heading">Discussion</h2>
+              <span>{totalComments} comments</span>
+            </div>
 
             <form className="comment-form" onSubmit={handleCommentSubmit}>
-              <label className="field">
-                <span>Add a comment</span>
-                <input
-                  type="text"
-                  placeholder="Add a response or question"
-                  value={commentBody}
-                  onChange={(event) => setCommentBody(event.target.value)}
-                />
-              </label>
-              {commentError ? <p className="form-message form-message--error">{commentError}</p> : null}
-              <button className="button button--primary" type="submit">
-                Post comment
-              </button>
+              <span className="comment-avatar" aria-hidden="true">
+                {session?.user ? getInitials(getDisplayName(session.user)) : 'G'}
+              </span>
+              <div className="comment-form__main">
+                <label className="comment-input-label">
+                  <span className="sr-only">Add a comment</span>
+                  <input
+                    type="text"
+                    placeholder={session?.user ? 'Add a comment...' : 'Sign in to comment'}
+                    value={commentBody}
+                    onChange={(event) => setCommentBody(event.target.value)}
+                  />
+                </label>
+                {commentError ? <p className="form-message form-message--error">{commentError}</p> : null}
+                <div className="comment-form__actions">
+                  {commentBody ? (
+                    <button
+                      className="button button--ghost button--small"
+                      type="button"
+                      onClick={() => {
+                        setCommentBody('')
+                        setCommentError('')
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  ) : null}
+                  <button
+                    className="button button--primary button--small"
+                    type="submit"
+                    disabled={session?.user ? !commentBody.trim() || isLoadingComment : false}
+                  >
+                    {isLoadingComment ? <LoadingDots /> : 'Comment'}
+                  </button>
+                </div>
+              </div>
             </form>
 
             <div className="comment-list">
@@ -892,20 +1193,26 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
                 <>
                   {comments.map((comment) => (
                     <article key={comment.id} className="comment-card">
-                      <div className="comment-card__top">
-                        <strong>{getDisplayName(comment.author)}</strong>
-                        <span>{formatShortDate(comment.createdAt)}</span>
+                      <span className="comment-avatar" aria-hidden="true">
+                        {getInitials(getDisplayName(comment.author))}
+                      </span>
+                      <div className="comment-card__body">
+                        <div className="comment-card__top">
+                          <strong>{getDisplayName(comment.author)}</strong>
+                          <span>{formatShortDate(comment.createdAt)}</span>
+                        </div>
+                        <p>{comment.body}</p>
+                        {(session?.user?.role === 'admin' || comment.author?.id === session?.user?.id || article.author?.id === session?.user?.id) ? (
+                          <button
+                            type="button"
+                            className="comment-delete"
+                            onClick={() => handleCommentDelete(comment.id)}
+                            disabled={deletingCommentIds.has(comment.id)}
+                          >
+                            {deletingCommentIds.has(comment.id) ? <LoadingDots /> : 'Delete'}
+                          </button>
+                        ) : null}
                       </div>
-                      <p>{comment.body}</p>
-                      {(session?.user?.role === 'admin' || comment.author?.id === session?.user?.id || article.author?.id === session?.user?.id) ? (
-                        <button
-                          type="button"
-                          className="button button--ghost button--small comment-delete"
-                          onClick={() => handleCommentDelete(comment.id)}
-                        >
-                          Delete comment
-                        </button>
-                      ) : null}
                     </article>
                   ))}
                   {comments.length < totalComments ? (

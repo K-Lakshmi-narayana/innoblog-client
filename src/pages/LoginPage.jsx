@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { GoogleLogin } from '@react-oauth/google'
 
 import LoadingDots from '../components/LoadingDots'
-import { loginBenefits } from '../data/siteContent'
 import { getUserFriendlyError } from '../utils/errorMessages'
 
 export default function LoginPage({ onRequestOtp, onVerifyOtp, onGoogleLogin, session }) {
