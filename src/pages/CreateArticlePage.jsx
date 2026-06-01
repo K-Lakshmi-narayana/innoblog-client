@@ -425,7 +425,6 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
           </div>
           <div className="draft-status">
             <span className="draft-status__icon">{draftStatus === 'autosaving' ? 'Saving' : 'Saved'}</span>
-            <span>{draftStatusLabel}</span>
           </div>
         </div>
 
