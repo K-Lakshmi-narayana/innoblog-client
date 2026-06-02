@@ -604,7 +604,7 @@ export default function ProfilePage({
       {viewingSelf ? (
         <section className="profile-layout">
           <div>
-          <div style={{marginBottom: "12px"}} className="panel profile-admin__card">
+          {session?.user?.role === 'admin' && <div style={{marginBottom: "12px"}} className="panel profile-admin__card">
                 <span className="eyebrow">Reading ads</span>
                 <label className="admin-toggle">
                   <span>
@@ -619,7 +619,7 @@ export default function ProfilePage({
                   />
                   <span className="admin-toggle__track" aria-hidden="true" />
                 </label>
-              </div>
+              </div>}
           <form className="panel profile-editor" onSubmit={handleSaveProfile}>
             <div className="section-heading section-heading--tight">
               <div>
