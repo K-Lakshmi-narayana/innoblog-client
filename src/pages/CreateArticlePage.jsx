@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { FaExpand, FaCompress, FaTrash } from 'react-icons/fa'
 
-import { apiRequest, resolveImageUrl } from '../api'
+import { apiRequest } from '../api'
 import Editor from '../components/Editor'
 import TagSelector from '../components/TagSelector'
 import LoadingDots from '../components/LoadingDots'
@@ -9,7 +8,6 @@ import { domainLookup, domains, publishingChecklist } from '../data/siteContent'
 import { getTagSuggestionsForDomain, normalizeTagKey } from '../data/tagSuggestions'
 import { estimateReadTime, stripHtml } from '../utils/articleUtils'
 import { getUserFriendlyError } from '../utils/errorMessages'
-import { uploadImageFile } from '../utils/uploads'
 import {
   ARTICLE_IMAGE_LIMITS,
   formatFileSize,
@@ -426,7 +424,7 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
             <p>Draft the article, add discovery details, and submit it for publication.</p>
           </div>
           <div className="draft-status">
-            <span className="draft-status__icon">{draftStatusLabel}</span>
+            <span className="draft-status__icon">{draftStatus === 'autosaving' ? 'Saving' : 'Saved'}</span>
           </div>
         </div>
 
@@ -537,45 +535,25 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
                   return
                 }
 
-                setCoverImageError('Uploading cover image...')
-                try {
-                  const image = await uploadImageFile(file, 'cover')
+                const reader = new FileReader()
+                reader.onload = () => {
                   setForm((currentForm) => ({
                     ...currentForm,
-                    coverImage: image.url || image.path || '',
+                    coverImage: reader.result || '',
                   }))
                   setCoverImageError('')
                   setError('')
-                } catch (uploadError) {
-                  const message = getUserFriendlyError(uploadError)
-                  setCoverImageError(message)
-                  setError(message)
-                } finally {
-                  event.target.value = ''
                 }
+                reader.readAsDataURL(file)
               }}
             />
             {form.coverImage ? (
               <div className="cover-preview">
-                <img src={resolveImageUrl(form.coverImage)} alt="Cover preview" />
-                <button
-                  type="button"
-                  className="cover-remove-btn"
-                  onClick={() => {
-                    setForm((currentForm) => ({
-                      ...currentForm,
-                      coverImage: '',
-                    }))
-                    setCoverImageError('')
-                  }}
-                  title="Remove cover image"
-                >
-                  <FaTrash /> Remove
-                </button>
+                <img src={form.coverImage} alt="Cover preview" />
               </div>
             ) : (
               <p className="field-note">
-                JPEG, PNG, or WebP up to {formatFileSize(ARTICLE_IMAGE_LIMITS.maxBytes)}.
+                JPEG, PNG, WebP, or GIF up to {formatFileSize(ARTICLE_IMAGE_LIMITS.maxBytes)}.
               </p>
             )}
             {coverImageError ? (
@@ -600,10 +578,9 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
             <button
               type="button"
               className="button button--ghost"
-              title={editorFullscreen ? 'Exit full screen' : 'Expand to full screen'}
               onClick={() => setEditorFullscreen((value) => !value)}
             >
-              {editorFullscreen ? <FaCompress /> : <FaExpand />}
+            {editorFullscreen ? 'Exit full screen' : 'Expand editor'}
             </button>
           </div>
 

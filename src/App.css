@@ -79,7 +79,7 @@ h1, h2, h3, h4, h5, h6 {
 .page-stack {
   display: grid;
   gap: 1.35rem;
-  padding-left: 0.75rem;
+  padding-left: 0.55rem;
 }
 
 .panel {
@@ -343,12 +343,13 @@ h1, h2, h3, h4, h5, h6 {
   place-items: center;
   padding: 1.125rem;
   margin-left: 12px;
+  margin-right: 12px;
   width: 100%;
 }
 
 @media (max-width: 768px) {
   .loading-screen {
-    margin-left: 0;
+    margin-left: 12px;
     width: 100%;
   }
   .cta-form{
@@ -985,6 +986,7 @@ h1, h2, h3, h4, h5, h6 {
   align-content: end;
   gap: 0.75rem;
   text-decoration: none;
+  padding: 1px;
 }
 
 .featured-carousel__slide h2 {
@@ -3166,7 +3168,7 @@ html {
     align-items: center;
   }
   .field--small{
-    width: 90vw;
+    width: 82vw;
   }
   .catalog-search{
     width: 100%;
@@ -3176,9 +3178,6 @@ html {
 @media (max-width: 576.0px) {
   .site-footer {
     margin-left: 0 !important;
-    width: 100% !important;
-  }
-   .article-image-carousel{
     width: 100% !important;
   }
 }
@@ -5165,12 +5164,16 @@ h3 {
 .featured-carousel__slide {
   min-width: 100%;
   height: 468px;
-  align-content: stretch;
+  align-content: start;
 }
 
 .featured-carousel__slide .article-card {
-  height: 468px;
-  min-height: 468px;
+  height: 466px;
+  min-height: 465px;
+}
+
+.featured-carousel__slide .article-card:hover {
+  transition: none;
 }
 
 .featured-carousel .article-card__copy p,
