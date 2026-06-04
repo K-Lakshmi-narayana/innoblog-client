@@ -59,9 +59,7 @@ h1, h2, h3, h4, h5, h6 {
   .desktop-theme {
     display: none;
   }
-}
 
-@media (min-width: 576.8px) {
   .topic-strip {
     display: none !important;
   }
@@ -72,6 +70,9 @@ h1, h2, h3, h4, h5, h6 {
 
   .auth-form {
     width: 60% !important;
+  }
+  .page-stack{
+    padding-right: 0.75rem;
   }
 }
 
@@ -3177,6 +3178,9 @@ html {
     margin-left: 0 !important;
     width: 100% !important;
   }
+   .article-image-carousel{
+    width: 100% !important;
+  }
 }
 
 .site-footer__grid {
@@ -3326,6 +3330,9 @@ html {
 
   .story-hero__visual strong {
     font-size: 2.85rem;
+  }
+  .page-stack{
+    padding-right: 0px;
   }
 }
 

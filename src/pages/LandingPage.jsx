@@ -221,7 +221,7 @@ export default function LandingPage({
                 ? session.user.canWrite
                   ? 'Write Article'
                   : 'My Profile'
-                : 'Join Now'}
+                : 'Sign in'}
             </a>
             <a className="button button--secondary" href="/articles">
               Explore Articles
