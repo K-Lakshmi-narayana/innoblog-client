@@ -69,7 +69,7 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .auth-form {
-    width: 60% !important;
+    width: 100% !important;
   }
   .page-stack{
     padding-right: 0.75rem;
@@ -1338,7 +1338,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .auth-form{
-  width: 100%;
+  width: 60%;
 }
 
 .auth-panel--feature {
