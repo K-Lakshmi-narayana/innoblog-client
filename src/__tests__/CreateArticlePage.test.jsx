@@ -6,6 +6,11 @@ import { apiRequest } from '../api'
 
 vi.mock('../api', () => ({
   apiRequest: vi.fn(),
+  resolveImageUrl: vi.fn((path) => (
+    String(path || '').startsWith('/uploads/')
+      ? `http://localhost:4000${path}`
+      : path
+  )),
 }))
 
 vi.mock('../components/Editor', () => ({

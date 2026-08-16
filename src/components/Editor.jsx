@@ -111,6 +111,36 @@ function parseDimension(value, fallback, min = 160, max = 1200) {
   return Math.max(min, Math.min(max, parsedValue))
 }
 
+function getCurrentCodeEditorTheme() {
+  if (typeof document === 'undefined') {
+    return 'vs'
+  }
+
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'vs-dark' : 'vs'
+}
+
+function useCodeEditorTheme() {
+  const [theme, setTheme] = useState(getCurrentCodeEditorTheme)
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return undefined
+    }
+
+    function syncTheme() {
+      setTheme(getCurrentCodeEditorTheme())
+    }
+
+    syncTheme()
+    const observer = new MutationObserver(syncTheme)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+
+    return () => observer.disconnect()
+  }, [])
+
+  return theme
+}
+
 function ResizableImageComponent({ node, updateAttributes, selected, deleteNode }) {
   const [size, setSize] = useState({
     width: node.attrs.width || 520,
@@ -648,6 +678,7 @@ const ImageCarousel = Node.create({
 function MonacoCodeBlock({ node, updateAttributes, editor, getPos }) {
   const value = node.textContent || ''
   const language = node.attrs?.language || 'python'
+  const monacoTheme = useCodeEditorTheme()
   const lines = value.split('\n').length || 1
   const height = `${Math.max(120, Math.min(800, lines * 22 + 24))}px`
 
@@ -721,7 +752,7 @@ function MonacoCodeBlock({ node, updateAttributes, editor, getPos }) {
 
   return (
     <NodeViewWrapper>
-      <div className="monaco-code-block">
+      <div className={`monaco-code-block monaco-code-block--${monacoTheme === 'vs-dark' ? 'dark' : 'light'}`}>
         <div className="code-block-header">
           <select
             value={language}
@@ -749,7 +780,7 @@ function MonacoCodeBlock({ node, updateAttributes, editor, getPos }) {
           language={language}
           value={value}
           onChange={handleChange}
-          theme="vs-dark"
+          theme={monacoTheme}
           options={{
             minimap: { enabled: false },
             fontSize: 14,
@@ -776,8 +807,10 @@ const MonacoCodeBlockExtension = CodeBlock.extend({
           if (!attributes.language) {
             return {}
           }
+          const language = String(attributes.language).trim() || 'python'
           return {
-            'data-language': attributes.language,
+            'data-language': language,
+            class: `language-${language}`,
           }
         },
       },

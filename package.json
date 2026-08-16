@@ -38,6 +38,9 @@
     "react-dom": "^19.2.4",
     "react-icons": "^5.6.0"
   },
+  "overrides": {
+    "dompurify": "^3.4.13"
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.59.1",

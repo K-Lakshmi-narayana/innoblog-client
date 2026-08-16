@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { apiRequest } from '../api'
+import { apiRequest, resolveImageUrl } from '../api'
 import Editor from '../components/Editor'
 import TagSelector from '../components/TagSelector'
 import LoadingDots from '../components/LoadingDots'
@@ -20,6 +20,7 @@ import {
   validateImageFile,
   validateTags,
 } from '../utils/validations'
+import { uploadImageFile } from '../utils/uploads'
 
 const initialBody =
   '<p>Start with the problem, explain what changed your mind, and close with a takeaway readers can use.</p>'
@@ -141,7 +142,6 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
     : articleSlug
     ? 'Edit article'
     : 'Create a new article'
-  const draftStatusLabel = draftStatus === 'autosaving' ? 'Autosaving...' : draftStatus
 
   useEffect(() => {
     if (!draftSlug && !articleSlug) {
@@ -535,25 +535,31 @@ export default function CreateArticlePage({ onPublish, session, articleSlug, dra
                   return
                 }
 
-                const reader = new FileReader()
-                reader.onload = () => {
+                setCoverImageError('Uploading cover image...')
+                try {
+                  const image = await uploadImageFile(file, 'cover')
                   setForm((currentForm) => ({
                     ...currentForm,
-                    coverImage: reader.result || '',
+                    coverImage: image.url || image.path || '',
                   }))
                   setCoverImageError('')
                   setError('')
+                } catch (uploadError) {
+                  const message = getUserFriendlyError(uploadError)
+                  setCoverImageError(message)
+                  setError(message)
+                } finally {
+                  event.target.value = ''
                 }
-                reader.readAsDataURL(file)
               }}
             />
             {form.coverImage ? (
               <div className="cover-preview">
-                <img src={form.coverImage} alt="Cover preview" />
+                <img src={resolveImageUrl(form.coverImage)} alt="Cover preview" />
               </div>
             ) : (
               <p className="field-note">
-                JPEG, PNG, WebP, or GIF up to {formatFileSize(ARTICLE_IMAGE_LIMITS.maxBytes)}.
+                JPEG, PNG, or WebP up to {formatFileSize(ARTICLE_IMAGE_LIMITS.maxBytes)}.
               </p>
             )}
             {coverImageError ? (

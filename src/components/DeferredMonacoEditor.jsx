@@ -1,5 +1,16 @@
-import { useEffect, useState } from 'react'
-import MonacoEditor from '@monaco-editor/react'
+import { Suspense, lazy, useEffect, useState } from 'react'
+
+const MonacoEditor = lazy(() => import('@monaco-editor/react'))
+
+function MonacoPlaceholder({ height = 160 }) {
+  return (
+    <div
+      className="monaco-editor-placeholder"
+      style={{ height }}
+      aria-hidden="true"
+    />
+  )
+}
 
 export default function DeferredMonacoEditor({ height = 160, ...props }) {
   const [ready, setReady] = useState(false)
@@ -19,14 +30,12 @@ export default function DeferredMonacoEditor({ height = 160, ...props }) {
   }, [])
 
   if (!ready) {
-    return (
-      <div
-        className="monaco-editor-placeholder"
-        style={{ height }}
-        aria-hidden="true"
-      />
-    )
+    return <MonacoPlaceholder height={height} />
   }
 
-  return <MonacoEditor height={height} {...props} />
+  return (
+    <Suspense fallback={<MonacoPlaceholder height={height} />}>
+      <MonacoEditor height={height} {...props} />
+    </Suspense>
+  )
 }

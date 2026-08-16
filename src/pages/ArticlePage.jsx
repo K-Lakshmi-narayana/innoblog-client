@@ -4,6 +4,7 @@ import { FaChevronLeft, FaChevronRight, FaHeart, FaRegHeart } from 'react-icons/
 
 import { apiRequest, resolveImageUrl } from '../api'
 import ArticleCard from '../components/ArticleCard'
+import DeferredMonacoEditor from '../components/DeferredMonacoEditor'
 import ShareButton from '../components/ShareButton'
 import LoadingDots from '../components/LoadingDots'
 import { navigateTo } from '../hooks/useHashRoute'
@@ -79,6 +80,22 @@ const BLOCK_ARTICLE_TAGS = new Set([
 
 const INLINE_TAGS_WITH_BLOCK_FALLBACK = new Set(['span', 'strong', 'em'])
 const VOID_ARTICLE_TAGS = new Set(['br', 'img'])
+const CODE_LANGUAGE_LABELS = {
+  c: 'C',
+  cpp: 'C++',
+  css: 'CSS',
+  html: 'HTML',
+  java: 'Java',
+  javascript: 'JavaScript',
+  json: 'JSON',
+  markdown: 'Markdown',
+  php: 'PHP',
+  python: 'Python',
+  sql: 'SQL',
+  typescript: 'TypeScript',
+  xml: 'XML',
+  yaml: 'YAML',
+}
 
 function normalizeCarouselImages(value) {
   if (!value) {
@@ -104,6 +121,97 @@ function normalizeCarouselImages(value) {
 function getCarouselDimension(value, fallback) {
   const parsedValue = Number.parseInt(String(value || ''), 10)
   return Number.isFinite(parsedValue) ? parsedValue : fallback
+}
+
+function normalizeCodeLanguage(language = '') {
+  const normalized = String(language || '').trim().toLowerCase()
+
+  if (normalized === 'js') return 'javascript'
+  if (normalized === 'ts') return 'typescript'
+  if (normalized === 'py') return 'python'
+  if (normalized === 'c++') return 'cpp'
+  if (normalized === 'yml') return 'yaml'
+  if (normalized === 'md') return 'markdown'
+
+  return normalized || 'javascript'
+}
+
+function getCodeLanguageLabel(language = '') {
+  const normalized = normalizeCodeLanguage(language)
+  return CODE_LANGUAGE_LABELS[normalized] || normalized.toUpperCase()
+}
+
+function getCurrentArticleCodeTheme() {
+  if (typeof document === 'undefined') {
+    return 'vs'
+  }
+
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'vs-dark' : 'vs'
+}
+
+function useArticleCodeTheme() {
+  const [theme, setTheme] = useState(getCurrentArticleCodeTheme)
+
+  useEffect(() => {
+    if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') {
+      return undefined
+    }
+
+    const updateTheme = () => setTheme(getCurrentArticleCodeTheme())
+    const observer = new MutationObserver(updateTheme)
+
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    updateTheme()
+
+    return () => observer.disconnect()
+  }, [])
+
+  return theme
+}
+
+function getCodeBlockHeight(sourceCode = '') {
+  const lineCount = Math.max(1, String(sourceCode || '').split('\n').length)
+  return `${Math.max(140, Math.min(720, lineCount * 22 + 56))}px`
+}
+
+function ArticleCodeBlock({ language, value }) {
+  const normalizedLanguage = normalizeCodeLanguage(language)
+  const monacoTheme = useArticleCodeTheme()
+
+  return (
+    <div
+      className={`article-code-block article-code-block--monaco language-${normalizedLanguage}`}
+      data-language={normalizedLanguage}
+    >
+      <div className="article-code-block__header">
+        <span>{getCodeLanguageLabel(normalizedLanguage)}</span>
+      </div>
+      <div className="article-code-block__editor">
+        <DeferredMonacoEditor
+          height={getCodeBlockHeight(value)}
+          language={normalizedLanguage}
+          value={value}
+          theme={monacoTheme}
+          options={{
+            readOnly: true,
+            domReadOnly: true,
+            minimap: { enabled: false },
+            fontSize: 14,
+            lineNumbers: 'on',
+            lineNumbersMinChars: 3,
+            roundedSelection: false,
+            scrollBeyondLastLine: false,
+            automaticLayout: true,
+            wordWrap: 'on',
+            renderLineHighlight: 'none',
+            folding: false,
+            contextmenu: false,
+            overviewRulerLanes: 0,
+          }}
+        />
+      </div>
+    </div>
+  )
 }
 
 function ArticleImageCarousel({ images, width = 360, height = 540 }) {
@@ -738,16 +846,10 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
 
     if (tagName === 'pre') {
       const code = node.querySelector('code')
-      const language = getCodeLanguageFromAttributes(code || node)
+      const language = normalizeCodeLanguage(getCodeLanguageFromAttributes(code || node))
       const value = code?.textContent || node.textContent || ''
 
-      return (
-        <div key={key} className="article-code-block">
-          <pre>
-            <code className={`language-${language}`}>{value}</code>
-          </pre>
-        </div>
-      )
+      return <ArticleCodeBlock key={key} language={language} value={value} />
     }
 
     if (tagName === 'code' && node.parentElement?.tagName.toLowerCase() !== 'pre') {
