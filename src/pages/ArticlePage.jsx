@@ -1,10 +1,26 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import katex from 'katex'
+import Prism from 'prismjs'
+import 'prismjs/components/prism-markup'
+import 'prismjs/components/prism-css'
+import 'prismjs/components/prism-clike'
+import 'prismjs/components/prism-javascript'
+import 'prismjs/components/prism-typescript'
+import 'prismjs/components/prism-c'
+import 'prismjs/components/prism-cpp'
+import 'prismjs/components/prism-java'
+import 'prismjs/components/prism-markup-templating'
+import 'prismjs/components/prism-php'
+import 'prismjs/components/prism-python'
+import 'prismjs/components/prism-sql'
+import 'prismjs/components/prism-json'
+import 'prismjs/components/prism-yaml'
+import 'prismjs/components/prism-markdown'
+import 'prismjs/components/prism-bash'
 import { FaChevronLeft, FaChevronRight, FaHeart, FaRegHeart } from 'react-icons/fa'
 
 import { apiRequest, resolveImageUrl } from '../api'
 import ArticleCard from '../components/ArticleCard'
-import DeferredMonacoEditor from '../components/DeferredMonacoEditor'
 import ShareButton from '../components/ShareButton'
 import LoadingDots from '../components/LoadingDots'
 import { navigateTo } from '../hooks/useHashRoute'
@@ -128,10 +144,13 @@ function normalizeCodeLanguage(language = '') {
 
   if (normalized === 'js') return 'javascript'
   if (normalized === 'ts') return 'typescript'
+  if (normalized === 'jsx') return 'javascript'
+  if (normalized === 'tsx') return 'typescript'
   if (normalized === 'py') return 'python'
   if (normalized === 'c++') return 'cpp'
   if (normalized === 'yml') return 'yaml'
   if (normalized === 'md') return 'markdown'
+  if (normalized === 'html' || normalized === 'xml') return normalized
 
   return normalized || 'javascript'
 }
@@ -141,75 +160,57 @@ function getCodeLanguageLabel(language = '') {
   return CODE_LANGUAGE_LABELS[normalized] || normalized.toUpperCase()
 }
 
-function getCurrentArticleCodeTheme() {
-  if (typeof document === 'undefined') {
-    return 'vs'
+function getPrismLanguageName(language = '') {
+  const normalized = normalizeCodeLanguage(language)
+
+  if (normalized === 'html' || normalized === 'xml') return 'markup'
+  if (normalized === 'shell' || normalized === 'bash' || normalized === 'sh') return 'bash'
+
+  return normalized
+}
+
+function escapeCodeHtml(value = '') {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+function getHighlightedCodeHtml(sourceCode = '', language = '') {
+  const prismLanguage = getPrismLanguageName(language)
+  const grammar = Prism.languages[prismLanguage]
+
+  if (!grammar) {
+    return escapeCodeHtml(sourceCode)
   }
 
-  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'vs-dark' : 'vs'
-}
-
-function useArticleCodeTheme() {
-  const [theme, setTheme] = useState(getCurrentArticleCodeTheme)
-
-  useEffect(() => {
-    if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') {
-      return undefined
-    }
-
-    const updateTheme = () => setTheme(getCurrentArticleCodeTheme())
-    const observer = new MutationObserver(updateTheme)
-
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
-    updateTheme()
-
-    return () => observer.disconnect()
-  }, [])
-
-  return theme
-}
-
-function getCodeBlockHeight(sourceCode = '') {
-  const lineCount = Math.max(1, String(sourceCode || '').split('\n').length)
-  return `${Math.max(140, Math.min(720, lineCount * 22 + 56))}px`
+  try {
+    return Prism.highlight(String(sourceCode || ''), grammar, prismLanguage)
+  } catch {
+    return escapeCodeHtml(sourceCode)
+  }
 }
 
 function ArticleCodeBlock({ language, value }) {
   const normalizedLanguage = normalizeCodeLanguage(language)
-  const monacoTheme = useArticleCodeTheme()
+  const highlightedCode = getHighlightedCodeHtml(value, normalizedLanguage)
 
   return (
     <div
-      className={`article-code-block article-code-block--monaco language-${normalizedLanguage}`}
+      className={`article-code-block article-code-block--static language-${normalizedLanguage}`}
       data-language={normalizedLanguage}
     >
       <div className="article-code-block__header">
         <span>{getCodeLanguageLabel(normalizedLanguage)}</span>
       </div>
-      <div className="article-code-block__editor">
-        <DeferredMonacoEditor
-          height={getCodeBlockHeight(value)}
-          language={normalizedLanguage}
-          value={value}
-          theme={monacoTheme}
-          options={{
-            readOnly: true,
-            domReadOnly: true,
-            minimap: { enabled: false },
-            fontSize: 14,
-            lineNumbers: 'on',
-            lineNumbersMinChars: 3,
-            roundedSelection: false,
-            scrollBeyondLastLine: false,
-            automaticLayout: true,
-            wordWrap: 'on',
-            renderLineHighlight: 'none',
-            folding: false,
-            contextmenu: false,
-            overviewRulerLanes: 0,
-          }}
+      <pre tabIndex={0}>
+        <code
+          className={`language-${normalizedLanguage}`}
+          dangerouslySetInnerHTML={{ __html: highlightedCode }}
         />
-      </div>
+      </pre>
     </div>
   )
 }
@@ -758,11 +759,13 @@ export default function ArticlePage({ slug, session, onDeleteArticle }) {
     }
 
     return (
-      <table key={key} {...getElementProps(node)}>
-        <tbody>
-          {rows.map((row, index) => renderTableRow(row, `${key}-row-${index}`))}
-        </tbody>
-      </table>
+      <div key={key} className="article-table-scroll" role="region" aria-label="Article table">
+        <table {...getElementProps(node)}>
+          <tbody>
+            {rows.map((row, index) => renderTableRow(row, `${key}-row-${index}`))}
+          </tbody>
+        </table>
+      </div>
     )
   }
 
